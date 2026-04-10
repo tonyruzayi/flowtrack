@@ -7,6 +7,167 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ─── SUPABASE CONFIGURATION ───────────────────────────────────
+const SUPABASE_URL  = 'https://bratijerqkcjjnrocwbp.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_dhECtSb9NNY2c9jKu0DDxA_diohwiM-';
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── LIVE DATA HELPERS ────────────────────────────────────────
+const DB = {
+  // Stock
+  async getStock() {
+    const { data, error } = await _sb.from('stock_levels')
+      .select('*, source:sources(name,type), product:products(name,unit)');
+    return error ? null : data;
+  },
+  async getSiteStock() {
+    const { data, error } = await _sb.from('site_stock')
+      .select('*, site:sites(name,type,province_id), product:products(name)');
+    return error ? null : data;
+  },
+  // Release orders
+  async getReleases() {
+    const { data, error } = await _sb.from('release_orders')
+      .select('*, customer:customers(name,tin), source:sources(name), product:products(name), transporter:transporters(name)')
+      .order('created_at', { ascending: false });
+    return error ? null : data;
+  },
+  async createRelease(payload) {
+    const { data, error } = await _sb.from('release_orders').insert(payload).select().single();
+    return { data, error };
+  },
+  async approveRelease(id, userId) {
+    return _sb.from('release_orders').update({
+      status: 'Approved', approval_status: 'Approved',
+      approved_by: userId, approved_at: new Date().toISOString()
+    }).eq('id', id);
+  },
+  async rejectRelease(id, reason, userId) {
+    return _sb.from('release_orders').update({
+      status: 'Rejected', approval_status: 'Rejected',
+      rejection_reason: reason, approved_by: userId, approved_at: new Date().toISOString()
+    }).eq('id', id);
+  },
+  // Invoices
+  async getInvoices() {
+    const { data, error } = await _sb.from('invoices')
+      .select('*, customer:customers(name), product:products(name,hs_code), release_order:release_orders(release_no)')
+      .order('created_at', { ascending: false });
+    return error ? null : data;
+  },
+  async createInvoice(payload) {
+    return _sb.from('invoices').insert(payload).select().single();
+  },
+  // Drawdowns
+  async getDrawdowns() {
+    const { data, error } = await _sb.from('release_drawdowns')
+      .select('*, release_order:release_orders(release_no, customer:customers(name), product:products(name))')
+      .order('created_at', { ascending: false });
+    return error ? null : data;
+  },
+  // Customers
+  async getCustomers() {
+    const { data } = await _sb.from('customers').select('*').eq('is_active', true).order('name');
+    return data || [];
+  },
+  // Products
+  async getProducts() {
+    const { data } = await _sb.from('products').select('*').eq('is_active', true).order('name');
+    return data || [];
+  },
+  // Sources / Depots
+  async getSources() {
+    const { data } = await _sb.from('sources').select('*').eq('is_active', true).order('name');
+    return data || [];
+  },
+  // Sites / Stations
+  async getSites() {
+    const { data } = await _sb.from('sites').select('*, province:provinces(name)').eq('is_active', true).order('name');
+    return data || [];
+  },
+  // Transporters
+  async getTransporters() {
+    const { data } = await _sb.from('transporters').select('*').eq('is_active', true).order('name');
+    return data || [];
+  },
+  // Supplier purchases
+  async getPurchases() {
+    const { data } = await _sb.from('supplier_purchases')
+      .select('*, source:sources(name), product:products(name)')
+      .order('created_at', { ascending: false });
+    return data || [];
+  },
+  // Users
+  async getUsers() {
+    const { data } = await _sb.from('user_profiles').select('*, role:roles(name,permissions)');
+    return data || [];
+  },
+  // Roles
+  async getRoles() {
+    const { data } = await _sb.from('roles').select('*').order('name');
+    return data || [];
+  },
+  // Audit log
+  async getAuditLog() {
+    const { data } = await _sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+    return data || [];
+  },
+  // Blending records
+  async getBlendRecords() {
+    const { data } = await _sb.from('blending_records')
+      .select('*, base:products!blending_records_base_product_id_fkey(name), additive:products!blending_records_additive_product_id_fkey(name)')
+      .order('created_at', { ascending: false });
+    return data || [];
+  },
+  // Stock transactions
+  async getStockTransactions() {
+    const { data } = await _sb.from('stock_transactions')
+      .select('*, source:sources(name), product:products(name)')
+      .order('created_at', { ascending: false }).limit(50);
+    return data || [];
+  },
+  // Write audit log entry
+  async logAction(action, entityType, entityRef, details) {
+    const { data: { user } } = await _sb.auth.getUser();
+    if (!user) return;
+    await _sb.from('audit_logs').insert({
+      user_id: user.id,
+      user_name: user.email,
+      action, entity_type: entityType, entity_ref: entityRef,
+      new_values: details ? JSON.stringify(details) : null
+    });
+  }
+};
+
+// ─── AUTH HELPERS ─────────────────────────────────────────────
+const Auth = {
+  async currentUser() {
+    const { data: { user } } = await _sb.auth.getUser();
+    return user;
+  },
+  async signIn(email, password) {
+    return _sb.auth.signInWithPassword({ email, password });
+  },
+  async signOut() {
+    return _sb.auth.signOut();
+  }
+};
+
+// ─── REALTIME SUBSCRIPTIONS ───────────────────────────────────
+function subscribeToRealtime() {
+  _sb.channel('stock-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_levels' }, () => {
+      showToast('Stock levels updated', 'info');
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'release_orders' }, () => {
+      document.getElementById('approval-badge').textContent =
+        (parseInt(document.getElementById('approval-badge').textContent) || 0);
+    })
+    .subscribe();
+}
+</script>
 <style>
 :root {
   --ink: #0a0f1e;
@@ -2608,21 +2769,88 @@ function downloadAllReports() {
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Date
   document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short',day:'2-digit',month:'short',year:'numeric'});
   // Set release date default
   const rd = document.getElementById('rel-date');
   if (rd) rd.value = new Date().toISOString().split('T')[0];
-  // Render initial dashboard
+
+  // ── Try live Supabase data ─────────────────────────────────
+  try {
+    const [customers, products, sources, transporters] = await Promise.all([
+      DB.getCustomers(), DB.getProducts(), DB.getSources(), DB.getTransporters()
+    ]);
+
+    // Populate customer dropdowns
+    if (customers.length > 0) {
+      const custSels = document.querySelectorAll('#rel-customer, #email-to');
+      document.querySelectorAll('#rel-customer').forEach(sel => {
+        sel.innerHTML = '<option value="">— Select Customer —</option>' +
+          customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      });
+    }
+
+    // Populate product dropdowns
+    if (products.length > 0) {
+      document.querySelectorAll('#rel-product').forEach(sel => {
+        sel.innerHTML = products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      });
+    }
+
+    // Populate source dropdowns
+    if (sources.length > 0) {
+      document.querySelectorAll('#rel-source').forEach(sel => {
+        sel.innerHTML = sources.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      });
+    }
+
+    // Populate transporter dropdowns
+    if (transporters.length > 0) {
+      const tOpts = '<option value="">— Own Collection —</option>' +
+        transporters.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      document.querySelectorAll('select').forEach(sel => {
+        if (sel.innerHTML.includes('Own Collection')) sel.innerHTML = tOpts;
+      });
+    }
+
+    // Load live stock into dashboard
+    const liveStock = await DB.getStock();
+    if (liveStock && liveStock.length > 0) {
+      // Override mock STOCK array with live data shape
+      liveStock.forEach((s, i) => {
+        if (STOCK[i]) {
+          STOCK[i].source  = s.source?.name || STOCK[i].source;
+          STOCK[i].product = s.product?.name || STOCK[i].product;
+          STOCK[i].balance = s.current_balance || STOCK[i].balance;
+          STOCK[i].reserved = s.reserved_quantity || STOCK[i].reserved;
+          STOCK[i].reorder  = s.reorder_level || STOCK[i].reorder;
+        }
+      });
+    }
+
+    // Subscribe to realtime changes
+    subscribeToRealtime();
+
+    // Show connected indicator
+    showToast('Connected to FlowTrack database', 'success');
+
+  } catch (err) {
+    console.warn('Supabase connection issue — running with demo data:', err.message);
+    showToast('Running with demo data (database connecting…)', 'warning');
+  }
+
+  // Render initial dashboard (works with either live or mock data)
   renderDashboard();
   calcBlend();
+
   // Close modals on overlay click
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
   });
+
   // Welcome toast
-  setTimeout(() => showToast('Welcome back, Tony! 1 release awaiting your approval.','info'), 800);
+  setTimeout(() => showToast('Welcome to FlowTrack! 1 release awaiting approval.', 'info'), 1200);
 });
 </script>
 <style>
