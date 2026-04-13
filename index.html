@@ -9,7 +9,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// Fallback: if unpkg failed, try jsdelivr
+if (!window.supabase) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"><\/script>');
+}
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <style>
@@ -2077,6 +2083,9 @@ document.addEventListener('keydown', e => {
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Supabase client NOW — library is guaranteed loaded at this point
   try {
+    if (!window.supabase || !window.supabase.createClient) {
+      throw new Error('Supabase library failed to load. Check your internet connection and reload the page.');
+    }
     sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
       auth: {
         autoRefreshToken: true,
@@ -2087,7 +2096,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   } catch(e) {
     const errEl = document.getElementById('login-err');
-    if (errEl) { errEl.textContent = 'Failed to initialize: ' + e.message; errEl.classList.add('on'); }
+    if (errEl) { errEl.textContent = e.message; errEl.classList.add('on'); }
+    const statusEl = document.getElementById('conn-status');
+    if (statusEl) { statusEl.textContent = '⚠ Library failed to load — reload the page'; statusEl.style.color = '#fca5a5'; }
     return;
   }
 
