@@ -728,8 +728,7 @@ function getSB() {
         auth: {
           autoRefreshToken: true,
           persistSession: true,
-          detectSessionInUrl: true,
-          flowType: 'pkce'
+          detectSessionInUrl: false
         }
       });
     } else {
@@ -2224,40 +2223,44 @@ async function doLogin() {
   btn.textContent = 'Signing in…';
 
   try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    console.log('Attempting sign in:', email);
+    const response = await sb.auth.signInWithPassword({ email, password: pass });
+    console.log('Auth response:', JSON.stringify({ error: response.error, user: response.data?.user?.email }));
 
-    if (error) {
-      console.error('Supabase auth error:', error);
-      let msg = error.message || 'Sign in failed.';
-      if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
+    if (response.error) {
+      const rawMsg = response.error.message || 'Sign in failed.';
+      console.error('Auth error:', rawMsg);
+      let msg = rawMsg;
+      if (rawMsg.toLowerCase().includes('invalid login') || rawMsg.toLowerCase().includes('invalid credentials')) {
         msg = 'Incorrect email or password. Please try again.';
-      } else if (msg.toLowerCase().includes('email not confirmed')) {
-        msg = 'Please confirm your email address before signing in. Check your inbox.';
-      } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
-        msg = 'Network error. Check your internet connection and try again.';
-      } else if (msg.toLowerCase().includes('api key')) {
-        msg = 'API key error — please contact your administrator.';
+      } else if (rawMsg.toLowerCase().includes('email not confirmed')) {
+        msg = 'Email not confirmed. In Supabase → Auth → Users → find your user → click ••• → Send confirmation email, OR disable "Confirm email" in Auth settings.';
+      } else if (rawMsg.toLowerCase().includes('network') || rawMsg.toLowerCase().includes('fetch')) {
+        msg = 'Network error. Check your internet connection.';
+      } else if (rawMsg.toLowerCase().includes('disabled') || rawMsg.toLowerCase().includes('provider')) {
+        msg = 'Email login is disabled. Go to Supabase → Auth → Providers → enable Email.';
       }
-      errEl.textContent = msg;
+      errEl.textContent = '⚠ ' + msg;
       errEl.classList.add('on');
       btn.disabled = false;
       btn.textContent = 'Sign In';
       return;
     }
 
-    if (!data?.user) {
-      errEl.textContent = 'Sign in failed — no user returned. Please try again.';
+    if (!response.data?.user) {
+      errEl.textContent = '⚠ Sign in failed — no user returned. Please try again.';
       errEl.classList.add('on');
       btn.disabled = false;
       btn.textContent = 'Sign In';
       return;
     }
 
-    _currentUser = data.user;
+    _currentUser = response.data.user;
     await onSignedIn();
 
   } catch (e) {
-    errEl.textContent = 'Unexpected error: ' + (e.message || String(e));
+    console.error('Login exception:', e);
+    errEl.textContent = '⚠ ' + (e.message || String(e));
     errEl.classList.add('on');
     btn.disabled = false;
     btn.textContent = 'Sign In';
@@ -2368,8 +2371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce'
+        detectSessionInUrl: false
       }
     });
   } catch(e) {
