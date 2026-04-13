@@ -667,37 +667,47 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 
 <script>
 // ═══════════════════════════════════════════
-// SUPABASE
+// SUPABASE — declared with var so it hoists
+// and is accessible from onclick handlers
 // ═══════════════════════════════════════════
-const SUPA_URL = 'https://bratijerqkcjjnrocwbp.supabase.co';
-const SUPA_KEY = 'sb_publishable_dhECtSb9NNY2c9jKu0DDxA_diohwiM-';
+var SUPA_URL = 'https://bratijerqkcjjnrocwbp.supabase.co';
+var SUPA_KEY = 'sb_publishable_dhECtSb9NNY2c9jKu0DDxA_diohwiM-';
+var sb = null; // will be set once supabase library loads
 
-// Supabase v2.49+ supports the new sb_publishable_ key format
-const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
+// Safe wrapper — all onclick handlers call this
+function getSB() {
+  if (!sb) {
+    if (window.supabase && window.supabase.createClient) {
+      sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+          flowType: 'pkce'
+        }
+      });
+    } else {
+      throw new Error('Supabase library not loaded yet. Please wait a moment and try again.');
+    }
   }
-});
+  return sb;
+}
 
-// Test connection on load and show status on login screen
+// Test connection and show status on login screen
 async function testConnection() {
   const statusEl = document.getElementById('conn-status');
   if (!statusEl) return;
   try {
-    // A simple ping — just check if supabase responds
     const { error } = await sb.from('roles').select('id').limit(1);
-    if (error && error.code !== 'PGRST116') {
-      statusEl.textContent = '⚠ Database: ' + error.message;
+    if (error && error.code !== 'PGRST116' && error.code !== '42501') {
+      statusEl.textContent = '⚠ ' + error.message;
       statusEl.style.color = '#fca5a5';
     } else {
       statusEl.textContent = '● Connected to FlowTrack database';
       statusEl.style.color = '#6ee7b7';
     }
   } catch(e) {
-    statusEl.textContent = '⚠ Cannot reach database: ' + e.message;
+    statusEl.textContent = '⚠ ' + e.message;
     statusEl.style.color = '#fca5a5';
   }
 }
@@ -1910,6 +1920,13 @@ async function doLogin() {
   errEl.style.borderColor = '';
   errEl.style.color = '';
 
+  // Guard — sb must be initialized
+  if (!sb) {
+    errEl.textContent = 'Still connecting to database… please wait a moment then try again.';
+    errEl.classList.add('on');
+    return;
+  }
+
   if (!email) {
     errEl.textContent = 'Please enter your email address.';
     errEl.classList.add('on'); return;
@@ -2058,6 +2075,22 @@ document.addEventListener('keydown', e => {
 // INIT — check existing session first
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize Supabase client NOW — library is guaranteed loaded at this point
+  try {
+    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      }
+    });
+  } catch(e) {
+    const errEl = document.getElementById('login-err');
+    if (errEl) { errEl.textContent = 'Failed to initialize: ' + e.message; errEl.classList.add('on'); }
+    return;
+  }
+
   // Test DB connection and show status on login screen
   testConnection();
 
