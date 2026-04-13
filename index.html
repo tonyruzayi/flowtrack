@@ -405,6 +405,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
     <div class="ni" data-page="reports"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>Reports</div>
     <div class="nl">Admin</div>
     <div class="ni" data-page="admin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>Admin Panel</div>
+    <div class="ni" data-page="trucks"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zm-17 7.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S5.33 17 4.5 17 3 16.33 3 15.5zm13.5 1.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12l1.5 2H5V6h10v6h2z"/></svg>Trucks / Fleet</div>
     <div class="ni" data-page="users"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Users & RBAC</div>
     <div class="ni" data-page="audit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>Audit Log</div>
   </nav>
@@ -540,6 +541,42 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 <section class="page" id="page-reports">
   <div class="sh"><div class="st">Reports & Analytics</div><button class="btn btn-o btn-sm" onclick="downloadAllReports()">Download All (CSV)</button></div>
   <div class="g3" id="reports-grid"></div>
+</section>
+
+<!-- TRUCKS -->
+<section class="page" id="page-trucks">
+  <div class="sh">
+    <div><div class="st">Trucks & Fleet Management</div><div class="ss">All registered trucks across all transporters</div></div>
+    <div class="flex gap2">
+      <button class="btn btn-o btn-sm" onclick="exportCSV('trucks')">Export CSV</button>
+      <button class="btn btn-b btn-sm" onclick="openCRUD('truck',null)">+ Add Truck</button>
+    </div>
+  </div>
+  <div class="g3 mb4" id="trucks-summary"></div>
+  <div class="card">
+    <div class="sh"><div class="st">All Trucks</div>
+      <div class="flex gap2">
+        <select class="sel" id="trucks-filter-trans" style="width:auto;font-size:.76rem;padding:5px 10px" onchange="renderTrucksPage()">
+          <option value="">All Transporters</option>
+        </select>
+        <select class="sel" id="trucks-filter-status" style="width:auto;font-size:.76rem;padding:5px 10px" onchange="renderTrucksPage()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Reg No.</th><th>Transporter</th><th>Make/Model</th><th>Year</th>
+          <th>Max Capacity (L)</th><th>Compartments</th><th>Tare (kg)</th>
+          <th>Default Driver</th><th>Driver Phone</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="trucks-tbl"><tr><td colspan="11" class="empty">No trucks yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </section>
 
 <!-- ADMIN -->
@@ -728,7 +765,7 @@ let DATA = {
   stock: [], txns: [], releases: [], drawdowns: [],
   invoices: [], suppliers: [], blends: [],
   customers: [], products: [], sources: [], sites: [],
-  transporters: [], provinces: [], sectors: [],
+  transporters: [], trucks: [], provinces: [], sectors: [],
   users: [], roles: [], audit: []
 };
 let _crudType = null;
@@ -742,7 +779,7 @@ const PAGE_TITLES = {
   dashboard:'Dashboard',stock:'Stock Levels',depots:'Depots & Sources',
   stations:'Service Stations',blending:'Blending Calculator',suppliers:'Supplier Releases',
   releases:'Release Orders',drawdowns:'Drawdowns',approvals:'Approvals',
-  invoices:'Invoices',reports:'Reports',admin:'Admin Panel',
+  invoices:'Invoices',reports:'Reports',admin:'Admin Panel',trucks:'Trucks & Fleet',
   users:'Users & RBAC',audit:'Audit Log',notifications:'Notifications'
 };
 
@@ -765,7 +802,7 @@ function renderPage(page) {
     stations: renderStations, suppliers: renderSuppliers, releases: renderReleases,
     drawdowns: renderDrawdowns, approvals: renderApprovals, invoices: renderInvoices,
     reports: renderReports, users: renderUsers, audit: renderAudit,
-    notifications: renderNotifs, blending: () => calcBlend(),
+    notifications: renderNotifs, blending: () => calcBlend(), trucks: renderTrucksPage,
     admin: () => adminTab('customers', document.querySelector('#admin-tabs .tab'))
   };
   map[page]?.();
@@ -791,7 +828,7 @@ async function loadAll() {
       {data:stock}, {data:txns}, {data:releases}, {data:drawdowns},
       {data:invoices}, {data:suppliers}, {data:blends},
       {data:customers}, {data:products}, {data:sources}, {data:sites},
-      {data:transporters}, {data:provinces}, {data:sectors},
+      {data:transporters}, {data:trucks}, {data:provinces}, {data:sectors},
       {data:users}, {data:roles}, {data:audit}
     ] = await Promise.all([
       sb.from('stock_levels').select('*,source:sources(name,type),product:products(name,unit)'),
@@ -806,6 +843,7 @@ async function loadAll() {
       sb.from('sources').select('*,province:provinces(name)').order('name'),
       sb.from('sites').select('*,province:provinces(name)').order('name'),
       sb.from('transporters').select('*').order('name'),
+      sb.from('trucks').select('*, transporter:transporters(name)').order('registration_no'),
       sb.from('provinces').select('*').order('name'),
       sb.from('sectors').select('*').order('name'),
       sb.from('user_profiles').select('*,role:roles(name,permissions)').order('full_name'),
@@ -825,6 +863,7 @@ async function loadAll() {
     DATA.sources     = sources     || [];
     DATA.sites       = sites       || [];
     DATA.transporters= transporters|| [];
+    DATA.trucks       = trucks       || [];
     DATA.provinces   = provinces   || [];
     DATA.sectors     = sectors     || [];
     DATA.users       = users       || [];
@@ -908,6 +947,71 @@ function renderDashboard() {
       <div style="width:26px;height:26px;border-radius:50%;background:#d1fae5;color:#059669;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;z-index:1">✓</div>
       <div style="flex:1;padding-top:3px"><div class="txs tbld">${a.action}</div><div class="txs tmut">${a.entity_ref||''} · ${fmtTime(a.created_at)}</div></div>
     </div>`).join('') : '<div class="empty">No activity yet.</div>';
+}
+
+function renderTrucksPage() {
+  // Populate transporter filter
+  const tf = document.getElementById('trucks-filter-trans');
+  if (tf && tf.options.length <= 1) {
+    DATA.transporters.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.name;
+      tf.appendChild(o);
+    });
+  }
+  // Summary cards
+  const sum = document.getElementById('trucks-summary');
+  if (sum) {
+    const total = DATA.trucks.length;
+    const active = DATA.trucks.filter(t=>t.is_active!==false).length;
+    const totalCap = DATA.trucks.reduce((s,t)=>s+(t.max_capacity_litres||0),0);
+    const avgCap = total ? Math.round(totalCap/total) : 0;
+    sum.innerHTML = `
+      <div class="card card-sm" style="border-left:4px solid var(--brand)">
+        <div class="txs tmut">Total Trucks</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;margin-top:4px">${total}</div>
+        <div class="txs" style="color:var(--em);margin-top:3px">${active} active</div>
+      </div>
+      <div class="card card-sm" style="border-left:4px solid var(--em)">
+        <div class="txs tmut">Total Fleet Capacity</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;margin-top:4px;color:var(--brand)">${fmt(totalCap)} L</div>
+        <div class="txs tmut mt1">across ${DATA.transporters.length} transporter${DATA.transporters.length!==1?'s':''}</div>
+      </div>
+      <div class="card card-sm" style="border-left:4px solid var(--sky)">
+        <div class="txs tmut">Avg Capacity / Truck</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;margin-top:4px">${fmt(avgCap)} L</div>
+        <div class="txs tmut mt1">per truck average</div>
+      </div>`;
+  }
+  renderTrucksTable();
+}
+
+function renderTrucksTable() {
+  const transFilter = document.getElementById('trucks-filter-trans')?.value || '';
+  const statusFilter = document.getElementById('trucks-filter-status')?.value || '';
+  let trucks = [...DATA.trucks];
+  if (transFilter) trucks = trucks.filter(t => t.transporter_id === transFilter);
+  if (statusFilter === 'active') trucks = trucks.filter(t => t.is_active !== false);
+  if (statusFilter === 'inactive') trucks = trucks.filter(t => t.is_active === false);
+
+  const tbl = document.getElementById('trucks-tbl');
+  if (!tbl) return;
+  tbl.innerHTML = trucks.length ? trucks.map(t => `<tr>
+    <td class="mono tbld">${t.registration_no}</td>
+    <td>${t.transporter?.name||'—'}</td>
+    <td>${t.make_model||'—'}</td>
+    <td>${t.year||'—'}</td>
+    <td style="font-weight:700;color:var(--brand)">${t.max_capacity_litres ? fmt(t.max_capacity_litres)+' L' : '—'}</td>
+    <td style="text-align:center">${t.compartments||'—'}</td>
+    <td>${t.tare_weight_kg ? fmt(t.tare_weight_kg)+' kg' : '—'}</td>
+    <td>${t.default_driver||'—'}</td>
+    <td>${t.driver_phone||'—'}</td>
+    <td><span class="badge ${t.is_active!==false?'bg':'bgr'}">${t.is_active!==false?'Active':'Inactive'}</span></td>
+    <td><div class="flex gap2">
+      <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('truck','${t.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+      <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('trucks','${t.id}','${t.registration_no}')" title="Delete"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+    </div></td>
+  </tr>`).join('') : '<tr><td colspan="11" class="empty">No trucks found.</td></tr>';
 }
 
 function renderStock() {
@@ -1269,16 +1373,18 @@ function adminTab(tab, el) {
       ].join(''))
     },
     transporters: {
-      heads: ['Company','Reg No','Contact','Phone','Fleet','Status',''],
-      rows: DATA.transporters.map(t=>[
-        `<td class="tbld">${t.name}</td>`,
-        `<td>${t.registration_number||'—'}</td>`,
-        `<td>${t.contact_person||'—'}</td>`,
-        `<td>${t.phone||'—'}</td>`,
-        `<td>${t.fleet_size||0} trucks</td>`,
-        `<td><span class="badge ${t.is_active?'bg':'bgr'}">${t.is_active?'Active':'Inactive'}</span></td>`,
-        `<td>${actBtns('transporter',t.id,t.name)}</td>`
-      ].join(''))
+      heads: ['Company','Contact','Phone','No. of Trucks','Status',''],
+      rows: DATA.transporters.map(t=>{
+        const truckCount = DATA.trucks.filter(k=>k.transporter_id===t.id).length;
+        return [
+          `<td class="tbld">${t.name}</td>`,
+          `<td>${t.contact_person||'—'}</td>`,
+          `<td>${t.phone||'—'}</td>`,
+          `<td><button class="btn btn-o btn-sm" onclick="viewTransporterTrucks('${t.id}','${t.name.replace(/'/g,"\\'")}')">${truckCount} truck${truckCount!==1?'s':''} →</button></td>`,
+          `<td><span class="badge ${t.is_active?'bg':'bgr'}">${t.is_active?'Active':'Inactive'}</span></td>`,
+          `<td>${actBtns('transporter',t.id,t.name)}</td>`
+        ].join('');
+      })
     },
     provinces: {
       heads: ['Province Name',''],
@@ -1328,8 +1434,131 @@ function actBtns(type, id, name) {
 }
 
 function tableFor(type) {
-  const m = {customer:'customers',product:'products',depot:'sources',source:'sources',station:'sites',transporter:'transporters',province:'provinces',sector:'sectors',user:'user_profiles',role:'roles'};
+  const m = {customer:'customers',product:'products',depot:'sources',source:'sources',station:'sites',transporter:'transporters',truck:'trucks',province:'provinces',sector:'sectors',user:'user_profiles',role:'roles'};
   return m[type] || type;
+}
+
+function filterTrucksByTransporter(transporterId) {
+  const sel = document.getElementById('f-truck');
+  if (!sel) return;
+  const trucks = transporterId
+    ? DATA.trucks.filter(t => t.transporter_id === transporterId && t.is_active !== false)
+    : DATA.trucks.filter(t => t.is_active !== false);
+  sel.innerHTML = `<option value="">— Select truck —</option>` +
+    trucks.map(t => `<option value="${t.registration_no}">${t.registration_no}${t.make_model ? ' ('+t.make_model+')' : ''}${t.max_capacity_litres ? ' — '+fmt(t.max_capacity_litres)+'L' : ''}</option>`).join('');
+  sel.onchange = function() {
+    const truck = DATA.trucks.find(t => t.registration_no === this.value);
+    if (truck?.default_driver) {
+      const d = document.getElementById('f-driver');
+      const di = document.getElementById('f-driverid');
+      if (d && !d.value) d.value = truck.default_driver;
+      if (di && !di.value) di.value = truck.driver_id_no || '';
+    }
+  };
+}
+
+function filterTrucksDrawdown(transporterId) {
+  const sel = document.getElementById('f-truck');
+  if (!sel) return;
+  const trucks = transporterId
+    ? DATA.trucks.filter(t => t.transporter_id === transporterId && t.is_active !== false)
+    : DATA.trucks.filter(t => t.is_active !== false);
+  sel.innerHTML = `<option value="">— Select truck —</option>` +
+    trucks.map(t => `<option value="${t.registration_no}">${t.registration_no}${t.make_model ? ' ('+t.make_model+')' : ''}${t.max_capacity_litres ? ' — '+fmt(t.max_capacity_litres)+'L' : ''}</option>`).join('');
+  sel.onchange = function() {
+    const truck = DATA.trucks.find(t => t.registration_no === this.value);
+    if (truck) {
+      const d = document.getElementById('f-driver');
+      const dp = document.getElementById('f-driverph');
+      const c = document.getElementById('f-comps');
+      if (d && !d.value && truck.default_driver) d.value = truck.default_driver;
+      if (dp && !dp.value && truck.driver_phone) dp.value = truck.driver_phone;
+      if (c && !c.value && truck.compartments) c.value = truck.compartments;
+    }
+  };
+}
+
+function prefillDrawdownFromRelease(releaseId) {
+  const rel = DATA.releases.find(r => r.id === releaseId);
+  if (!rel) return;
+  const remaining = (rel.quantity_requested||0) - (rel.quantity_released||0);
+  const qtyEl = document.getElementById('f-qty');
+  if (qtyEl && !qtyEl.value) qtyEl.value = remaining;
+  qtyEl && qtyEl.setAttribute('max', remaining);
+  qtyEl && qtyEl.setAttribute('placeholder', 'Max: '+fmt(remaining)+' L');
+  // Pre-select transporter from release
+  if (rel.transporter_id) {
+    const tSel = document.getElementById('f-trans-dd');
+    if (tSel) { tSel.value = rel.transporter_id; filterTrucksDrawdown(rel.transporter_id); }
+  }
+  // Pre-fill truck and driver from release
+  if (rel.truck_registration) {
+    setTimeout(() => {
+      const tSel = document.getElementById('f-truck');
+      if (tSel) tSel.value = rel.truck_registration;
+    }, 50);
+  }
+  if (rel.driver_name) {
+    const d = document.getElementById('f-driver');
+    if (d && !d.value) d.value = rel.driver_name;
+  }
+}
+  const trucks = DATA.trucks.filter(t => t.transporter_id === transporterId);
+  const content = document.getElementById('admin-content');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="card">
+      <div class="sh" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="st">${transporterName} — Fleet Management</div>
+          <div class="ss">${trucks.length} truck${trucks.length!==1?'s':''} registered · Total capacity: ${fmt(trucks.reduce((s,t)=>s+(t.max_capacity_litres||0),0))} L</div>
+        </div>
+        <div class="flex gap2">
+          <button class="btn btn-o btn-sm" onclick="adminTab('transporters',document.querySelector('[onclick*=transporters]'))">← Back</button>
+          <button class="btn btn-b btn-sm" onclick="openCRUDTruck('${transporterId}',null)">+ Add Truck</button>
+        </div>
+      </div>
+      ${trucks.length ? `
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th>Reg No.</th><th>Make / Model</th><th>Year</th>
+            <th>Max Capacity (L)</th><th>Compartments</th><th>Tare (kg)</th>
+            <th>Default Driver</th><th>Driver ID</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody>${trucks.map(t=>`<tr>
+            <td class="mono tbld">${t.registration_no}</td>
+            <td>${t.make_model||'—'}</td>
+            <td>${t.year||'—'}</td>
+            <td style="font-weight:700;color:var(--brand)">${t.max_capacity_litres?fmt(t.max_capacity_litres)+' L':'—'}</td>
+            <td>${t.compartments||'—'}</td>
+            <td>${t.tare_weight_kg?fmt(t.tare_weight_kg)+' kg':'—'}</td>
+            <td>${t.default_driver||'—'}</td>
+            <td>${t.driver_id_no||'—'}</td>
+            <td><span class="badge ${t.is_active!==false?'bg':'bgr'}">${t.is_active!==false?'Active':'Inactive'}</span></td>
+            <td><div class="flex gap2">
+              <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('truck','${t.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+              <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('trucks','${t.id}','${t.registration_no}')" title="Delete"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+            </div></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="g3 mt4" style="gap:12px">
+        <div style="background:var(--sur);border-radius:11px;padding:14px"><div class="txs tmut">Total Trucks</div><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-top:4px">${trucks.length}</div></div>
+        <div style="background:var(--sur);border-radius:11px;padding:14px"><div class="txs tmut">Total Fleet Capacity</div><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--brand);margin-top:4px">${fmt(trucks.reduce((s,t)=>s+(t.max_capacity_litres||0),0))} L</div></div>
+        <div style="background:var(--sur);border-radius:11px;padding:14px"><div class="txs tmut">Active Trucks</div><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--em);margin-top:4px">${trucks.filter(t=>t.is_active!==false).length}</div></div>
+      </div>` : `<div class="empty">No trucks yet for ${transporterName}. Click Add Truck to register the first one.</div>`}
+    </div>`;
+}
+
+function openCRUDTruck(transporterId, truckId) {
+  _crudType = 'truck';
+  _crudRecord = null;
+  document.getElementById('crud-title').textContent = truckId ? 'Edit Truck' : 'Add Truck';
+  document.getElementById('crud-body').innerHTML = FORMS.truck({ transporter_id: transporterId });
+  const sel = document.getElementById('f-trans');
+  if (sel && transporterId) sel.value = transporterId;
+  openModal('m-crud');
 }
 
 // ═══════════════════════════════════════════
@@ -1384,12 +1613,27 @@ const FORMS = {
 
   transporter: (d={})=>`<div class="fgrid">
     <div class="fg full"><label>Company Name *</label><input class="inp" id="f-name" value="${d.name||''}"/></div>
-    <div class="fg"><label>Registration Number</label><input class="inp" id="f-reg" value="${d.registration_number||''}"/></div>
     <div class="fg"><label>Contact Person</label><input class="inp" id="f-contact" value="${d.contact_person||''}"/></div>
     <div class="fg"><label>Phone</label><input class="inp" id="f-phone" value="${d.phone||''}"/></div>
     <div class="fg"><label>Email</label><input class="inp" type="email" id="f-email" value="${d.email||''}"/></div>
-    <div class="fg"><label>Fleet Size</label><input class="inp" type="number" id="f-fleet" value="${d.fleet_size||0}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-active"><option value="true" ${d.is_active!==false?'selected':''}>Active</option><option value="false">Inactive</option></select></div>
+    <div class="fg full" style="border-top:1px solid var(--bdr);padding-top:14px;margin-top:4px"><div class="txs tmut">After saving the transporter, use the Trucks tab to add individual trucks to this fleet.</div></div>
+  </div>`,
+
+  truck: (d={})=>`<div class="fgrid">
+    <div class="fg"><label>Registration No. *</label><input class="inp" id="f-regno" value="${d.registration_no||''}"/></div>
+    <div class="fg"><label>Transporter *</label><select class="sel" id="f-trans">${DATA.transporters.map(t=>`<option value="${t.id}" ${d.transporter_id===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
+    <div class="fg"><label>Make / Model</label><input class="inp" id="f-make" value="${d.make_model||''}"/></div>
+    <div class="fg"><label>Year</label><input class="inp" type="number" id="f-year" value="${d.year||''}" placeholder="e.g. 2020"/></div>
+    <div class="fg"><label>Max Load Capacity (Litres)</label><input class="inp" type="number" id="f-cap" value="${d.max_capacity_litres||''}" placeholder="e.g. 30000"/></div>
+    <div class="fg"><label>No. of Compartments</label><input class="inp" type="number" id="f-comps" value="${d.compartments||''}" placeholder="e.g. 4"/></div>
+    <div class="fg"><label>Tare Weight (kg)</label><input class="inp" type="number" id="f-tare" value="${d.tare_weight_kg||''}" placeholder="Optional"/></div>
+    <div class="fg"><label>Driver Name</label><input class="inp" id="f-driver" value="${d.default_driver||''}"/></div>
+    <div class="fg"><label>Driver ID No.</label><input class="inp" id="f-driverid" value="${d.driver_id_no||''}"/></div>
+    <div class="fg"><label>Driver Phone</label><input class="inp" id="f-driverph" value="${d.driver_phone||''}"/></div>
+    <div class="fg"><label>Fuel Type</label><select class="sel" id="f-fuel"><option ${d.fuel_type==='Diesel'?'selected':''}>Diesel</option><option ${d.fuel_type==='Petrol'?'selected':''}>Petrol</option></select></div>
+    <div class="fg"><label>Status</label><select class="sel" id="f-active"><option value="true" ${d.is_active!==false?'selected':''}>Active</option><option value="false">Inactive</option></select></div>
+    <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
 
   province: (d={})=>`<div class="fg full"><label>Province Name *</label><input class="inp" id="f-name" value="${d.name||''}"/></div>`,
@@ -1422,8 +1666,8 @@ const FORMS = {
     <div class="fg"><label>Product *</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Quantity (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity_requested||''}"/></div>
     <div class="fg"><label>Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001"/></div>
-    <div class="fg"><label>Transporter</label><select class="sel" id="f-trans"><option value="">— Own Collection —</option>${DATA.transporters.map(t=>`<option value="${t.id}" ${d.transporter_id===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
-    <div class="fg"><label>Truck Registration</label><input class="inp" id="f-truck" value="${d.truck_registration||''}"/></div>
+    <div class="fg"><label>Transporter</label><select class="sel" id="f-trans" onchange="filterTrucksByTransporter(this.value)"><option value="">— Own Collection —</option>${DATA.transporters.map(t=>`<option value="${t.id}" ${d.transporter_id===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
+    <div class="fg"><label>Truck *</label><select class="sel" id="f-truck"><option value="">— Select truck —</option>${DATA.trucks.map(t=>`<option value="${t.registration_no}" data-trans="${t.transporter_id}" ${d.truck_registration===t.registration_no?'selected':''}>${t.registration_no}${t.make_model?' ('+t.make_model+')':''}${t.max_capacity_litres?' — '+fmt(t.max_capacity_litres)+'L':''}</option>`).join('')}</select></div>
     <div class="fg"><label>Driver Name</label><input class="inp" id="f-driver" value="${d.driver_name||''}"/></div>
     <div class="fg"><label>Driver ID No.</label><input class="inp" id="f-driverid" value="${d.driver_id_no||''}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Draft'?'selected':''}>Draft</option><option ${d.status==='Pending Approval'?'selected':''}>Pending Approval</option><option ${d.status==='Approved'?'selected':''}>Approved</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Completed'?'selected':''}>Completed</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
@@ -1431,13 +1675,16 @@ const FORMS = {
   </div>`,
 
   drawdown: (d={})=>`<div class="fgrid">
-    <div class="fg full"><label>Release Order *</label><select class="sel" id="f-rel"><option value="">— Select Approved Release —</option>${DATA.releases.filter(r=>r.status==='Approved'||r.status==='Partial').map(r=>`<option value="${r.id}" ${d.release_order_id===r.id?'selected':''}>${r.release_no} – ${r.customer?.name||''} – ${fmt((r.quantity_requested||0)-(r.quantity_released||0))} L remaining</option>`).join('')}</select></div>
+    <div class="fg full"><label>Release Order *</label><select class="sel" id="f-rel" onchange="prefillDrawdownFromRelease(this.value)"><option value="">— Select Approved Release —</option>${DATA.releases.filter(r=>r.status==='Approved'||r.status==='Partial').map(r=>`<option value="${r.id}" ${d.release_order_id===r.id?'selected':''}>${r.release_no} – ${r.customer?.name||''} – ${fmt((r.quantity_requested||0)-(r.quantity_released||0))} L remaining</option>`).join('')}</select></div>
     <div class="fg"><label>Collection Date</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
-    <div class="fg"><label>Quantity (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}"/></div>
-    <div class="fg"><label>Truck Registration</label><input class="inp" id="f-truck" value="${d.truck_registration||''}"/></div>
+    <div class="fg"><label>Quantity to Draw (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Max shown after selecting release"/></div>
+    <div class="fg"><label>Transporter</label><select class="sel" id="f-trans-dd" onchange="filterTrucksDrawdown(this.value)"><option value="">— Select Transporter —</option>${DATA.transporters.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
+    <div class="fg"><label>Truck *</label><select class="sel" id="f-truck"><option value="">— Select truck —</option>${DATA.trucks.map(t=>`<option value="${t.registration_no}">${t.registration_no}${t.make_model?' ('+t.make_model+')':''}${t.max_capacity_litres?' — '+fmt(t.max_capacity_litres)+'L':''}</option>`).join('')}</select></div>
     <div class="fg"><label>Driver Name</label><input class="inp" id="f-driver" value="${d.driver_name||''}"/></div>
-    <div class="fg"><label>Collection Reference</label><input class="inp" id="f-cref" value="${d.collection_ref||''}"/></div>
-    <div class="fg"><label>Collected By</label><input class="inp" id="f-colby" value="${d.collected_by||''}"/></div>
+    <div class="fg"><label>Driver Phone</label><input class="inp" id="f-driverph" value="${d.driver_phone||''}"/></div>
+    <div class="fg"><label>No. of Compartments Used</label><input class="inp" type="number" id="f-comps" placeholder="e.g. 3"/></div>
+    <div class="fg"><label>Collection Reference (Depot)</label><input class="inp" id="f-cref" value="${d.collection_ref||''}"/></div>
+    <div class="fg"><label>Collected By (Name)</label><input class="inp" id="f-colby" value="${d.collected_by||''}"/></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
 
@@ -1500,16 +1747,43 @@ async function saveCRUD() {
   else if (type==='product') payload = {name:g('f-name'),hs_code:g('f-hs'),unit:g('f-unit')||'Litres',vat_rate:gn('f-vat')||0,is_blendable:gb('f-blend'),is_active:gb('f-active')};
   else if (type==='depot') payload = {name:g('f-name'),type:g('f-type'),location:g('f-loc'),province_id:g('f-prov')||null,contact_person:g('f-contact'),phone:g('f-phone'),email:g('f-email'),is_active:gb('f-active')};
   else if (type==='station') payload = {name:g('f-name'),type:g('f-type'),address:g('f-addr'),province_id:g('f-prov')||null,manager_name:g('f-mgr'),phone:g('f-phone'),tank_capacity:gn('f-cap'),reorder_level:gn('f-reorder'),is_company_owned:gb('f-owned'),is_active:gb('f-active')};
-  else if (type==='transporter') payload = {name:g('f-name'),registration_number:g('f-reg'),contact_person:g('f-contact'),phone:g('f-phone'),email:g('f-email'),fleet_size:gn('f-fleet')||0,is_active:gb('f-active')};
+  else if (type==='transporter') payload = {name:g('f-name'),contact_person:g('f-contact'),phone:g('f-phone'),email:g('f-email'),is_active:gb('f-active')};
+  else if (type==='truck') payload = {registration_no:g('f-regno'),transporter_id:g('f-trans')||null,make_model:g('f-make'),year:gn('f-year'),max_capacity_litres:gn('f-cap'),compartments:gn('f-comps'),tare_weight_kg:gn('f-tare'),default_driver:g('f-driver'),driver_id_no:g('f-driverid'),driver_phone:g('f-driverph'),fuel_type:g('f-fuel')||'Diesel',notes:g('f-notes'),is_active:gb('f-active')};
   else if (type==='province') payload = {name:g('f-name')};
   else if (type==='sector') payload = {name:g('f-name'),description:g('f-desc')};
   else if (type==='user') payload = {full_name:g('f-name'),email:g('f-email'),phone:g('f-phone'),department:g('f-dept'),role_id:g('f-role')||null,is_active:gb('f-active')};
   else if (type==='role') { let perms={}; try{perms=JSON.parse(g('f-perms')||'{}')}catch(e){} payload={name:g('f-name'),description:g('f-desc'),permissions:perms}; }
   else if (type==='release') {
     const qty=gn('f-qty')||0, price=gn('f-price')||0;
-    payload={release_no:g('f-relno'),release_date:g('f-date'),customer_id:g('f-cust')||null,source_id:g('f-src')||null,product_id:g('f-prod')||null,quantity_requested:qty,quantity_released:gn('f-qtyrel')||(_crudRecord?.quantity_released||0),unit_price:price,total_amount:qty*price,transporter_id:g('f-trans')||null,truck_registration:g('f-truck'),driver_name:g('f-driver'),driver_id_no:g('f-driverid'),status:g('f-status')||'Draft',notes:g('f-notes')};
+    const truckSel = document.getElementById('f-truck');
+    const truckReg = truckSel ? truckSel.value : g('f-truck');
+    payload={release_no:g('f-relno'),release_date:g('f-date'),customer_id:g('f-cust')||null,source_id:g('f-src')||null,product_id:g('f-prod')||null,quantity_requested:qty,quantity_released:gn('f-qtyrel')||(_crudRecord?.quantity_released||0),unit_price:price,total_amount:qty*price,transporter_id:g('f-trans')||null,truck_registration:truckReg,driver_name:g('f-driver'),driver_id_no:g('f-driverid'),status:g('f-status')||'Draft',notes:g('f-notes')};
   }
-  else if (type==='drawdown') payload={release_order_id:g('f-rel')||null,drawdown_date:g('f-date'),quantity:gn('f-qty'),truck_registration:g('f-truck'),driver_name:g('f-driver'),collection_ref:g('f-cref'),collected_by:g('f-colby'),notes:g('f-notes')};
+  else if (type==='drawdown') {
+    const truckSel = document.getElementById('f-truck');
+    payload={release_order_id:g('f-rel')||null,drawdown_date:g('f-date'),quantity:gn('f-qty'),truck_registration:truckSel?truckSel.value:g('f-truck'),driver_name:g('f-driver'),driver_phone:g('f-driverph'),compartments_used:gn('f-comps'),collection_ref:g('f-cref'),collected_by:g('f-colby'),notes:g('f-notes')};
+    // After saving drawdown, update release quantity_released
+    if (payload.release_order_id && payload.quantity) {
+      const rel = DATA.releases.find(r=>r.id===payload.release_order_id);
+      if (rel) {
+        const newReleased = (rel.quantity_released||0) + payload.quantity;
+        const newStatus = newReleased >= (rel.quantity_requested||0) ? 'Completed' : 'Partial';
+        setTimeout(async()=>{
+          await sb.from('release_orders').update({quantity_released:newReleased,status:newStatus}).eq('id',payload.release_order_id);
+          // Also update stock level
+          if (rel.source_id && rel.product_id) {
+            const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',rel.source_id).eq('product_id',rel.product_id).maybeSingle();
+            if (sl) {
+              const newBal = Math.max(0,(sl.current_balance||0)-payload.quantity);
+              await sb.from('stock_levels').update({current_balance:newBal,last_updated:new Date().toISOString()}).eq('id',sl.id);
+              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no});
+            }
+          }
+          await loadAll(); renderPage(currentPage());
+        },100);
+      }
+    }
+  }
   else if (type==='invoice') {
     const qty=gn('f-qty')||0,price=gn('f-price')||0,vatR=gn('f-vat')||0,paid=gn('f-paid')||0;
     const sub=qty*price, vatA=sub*vatR/100, tot=sub+vatA, bal=tot-paid;
@@ -1823,7 +2097,8 @@ function exportCSV(type) {
     invoices: [['Invoice No','Date','Customer','Product','Qty','Total','Paid','Balance','Status'],...DATA.invoices.map(i=>[i.invoice_no,i.invoice_date,i.customer?.name||'',i.product?.name||'',i.quantity||0,i.total_amount||0,i.amount_paid||0,i.balance_due||0,i.status])],
     suppliers: [['Supplier','Invoice Ref','Product','Ordered','Drawn','Balance','Status'],...DATA.suppliers.map(s=>[s.supplier_name||'',s.invoice_number||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.status])],
     blends: [['Ref','Date','Blend Ratio','Base Qty','Additive Qty','Output','Cost/L','Total Cost'],...DATA.blends.map(b=>[b.blend_ref,b.blend_date,b.blend_ratio+'%',b.base_quantity||0,b.additive_quantity||0,b.output_quantity||0,b.cost_per_litre||0,b.total_cost||0])],
-    stations: [['Name','Type','Province','Capacity','Status'],...DATA.sites.map(s=>[s.name,s.type,s.province?.name||'',s.tank_capacity||0,s.is_active?'Active':'Inactive'])]
+    stations: [['Name','Type','Province','Capacity','Status'],...DATA.sites.map(s=>[s.name,s.type,s.province?.name||'',s.tank_capacity||0,s.is_active?'Active':'Inactive'])],
+    trucks: [['Reg No','Transporter','Make/Model','Year','Max Capacity (L)','Compartments','Tare (kg)','Default Driver','Driver ID','Driver Phone','Status'],...DATA.trucks.map(t=>[t.registration_no,t.transporter?.name||'',t.make_model||'',t.year||'',t.max_capacity_litres||0,t.compartments||0,t.tare_weight_kg||0,t.default_driver||'',t.driver_id_no||'',t.driver_phone||'',t.is_active!==false?'Active':'Inactive'])]
   };
   const rows = csvData[type];
   if (!rows) { toast('No data for this report type','warning'); return; }
