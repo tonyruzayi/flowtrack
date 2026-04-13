@@ -1502,6 +1502,8 @@ function prefillDrawdownFromRelease(releaseId) {
     if (d && !d.value) d.value = rel.driver_name;
   }
 }
+
+function viewTransporterTrucks(transporterId, transporterName) {
   const trucks = DATA.trucks.filter(t => t.transporter_id === transporterId);
   const content = document.getElementById('admin-content');
   if (!content) return;
