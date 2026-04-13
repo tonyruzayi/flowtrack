@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <style>
@@ -335,6 +335,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
       </div>
       <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
       <div class="login-forgot"><a onclick="showReset()">Forgot your password?</a></div>
+      <div id="conn-status" style="text-align:center;font-size:.68rem;margin-top:16px;color:rgba(255,255,255,.25)">Connecting…</div>
     </div>
     <div class="login-dots">
       <div class="login-dot on"></div>
@@ -670,7 +671,36 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 // ═══════════════════════════════════════════
 const SUPA_URL = 'https://bratijerqkcjjnrocwbp.supabase.co';
 const SUPA_KEY = 'sb_publishable_dhECtSb9NNY2c9jKu0DDxA_diohwiM-';
-const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Supabase v2.49+ supports the new sb_publishable_ key format
+const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+});
+
+// Test connection on load and show status on login screen
+async function testConnection() {
+  const statusEl = document.getElementById('conn-status');
+  if (!statusEl) return;
+  try {
+    // A simple ping — just check if supabase responds
+    const { error } = await sb.from('roles').select('id').limit(1);
+    if (error && error.code !== 'PGRST116') {
+      statusEl.textContent = '⚠ Database: ' + error.message;
+      statusEl.style.color = '#fca5a5';
+    } else {
+      statusEl.textContent = '● Connected to FlowTrack database';
+      statusEl.style.color = '#6ee7b7';
+    }
+  } catch(e) {
+    statusEl.textContent = '⚠ Cannot reach database: ' + e.message;
+    statusEl.style.color = '#fca5a5';
+  }
+}
 
 // ═══════════════════════════════════════════
 // STATE — all empty to start fresh
@@ -1873,20 +1903,64 @@ async function doLogin() {
   const pass  = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-err');
   const btn   = document.getElementById('login-btn');
+
+  // Reset state
   errEl.classList.remove('on');
-  if (!email || !pass) { errEl.textContent = 'Please enter your email and password.'; errEl.classList.add('on'); return; }
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) {
-    errEl.textContent = error.message === 'Invalid login credentials'
-      ? 'Incorrect email or password. Please try again.'
-      : error.message;
-    errEl.classList.add('on');
-    btn.disabled = false; btn.textContent = 'Sign In';
-    return;
+  errEl.style.background = '';
+  errEl.style.borderColor = '';
+  errEl.style.color = '';
+
+  if (!email) {
+    errEl.textContent = 'Please enter your email address.';
+    errEl.classList.add('on'); return;
   }
-  _currentUser = data.user;
-  await onSignedIn();
+  if (!pass) {
+    errEl.textContent = 'Please enter your password.';
+    errEl.classList.add('on'); return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+
+    if (error) {
+      console.error('Supabase auth error:', error);
+      let msg = error.message || 'Sign in failed.';
+      if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
+        msg = 'Incorrect email or password. Please try again.';
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        msg = 'Please confirm your email address before signing in. Check your inbox.';
+      } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+        msg = 'Network error. Check your internet connection and try again.';
+      } else if (msg.toLowerCase().includes('api key')) {
+        msg = 'API key error — please contact your administrator.';
+      }
+      errEl.textContent = msg;
+      errEl.classList.add('on');
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+      return;
+    }
+
+    if (!data?.user) {
+      errEl.textContent = 'Sign in failed — no user returned. Please try again.';
+      errEl.classList.add('on');
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+      return;
+    }
+
+    _currentUser = data.user;
+    await onSignedIn();
+
+  } catch (e) {
+    errEl.textContent = 'Unexpected error: ' + (e.message || String(e));
+    errEl.classList.add('on');
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
 }
 
 async function doReset() {
@@ -1920,23 +1994,39 @@ async function signOut() {
 
 async function onSignedIn() {
   // Fetch user profile and role from DB
-  const { data: profile } = await sb.from('user_profiles')
-    .select('*, role:roles(name, permissions)')
-    .eq('id', _currentUser.id)
-    .maybeSingle();
+  let profile = null;
+  try {
+    const { data } = await sb.from('user_profiles')
+      .select('*, role:roles(name, permissions)')
+      .eq('id', _currentUser.id)
+      .maybeSingle();
+    profile = data;
+  } catch(e) {
+    console.warn('Could not load user profile:', e.message);
+  }
   _currentProfile = profile;
 
   // Update sidebar user block
-  const name  = profile?.full_name || _currentUser.email;
-  const role  = profile?.role?.name || 'User';
+  const name  = profile?.full_name || _currentUser.email || 'User';
+  const role  = profile?.role?.name || 'Admin';
   const init  = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('u-av').textContent   = init;
   document.getElementById('u-name').textContent = name;
   document.getElementById('u-role').textContent = role;
 
+  // Reset login button for next time
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').textContent = 'Sign In';
+
   hideLoginScreen();
   document.getElementById('tb-dt').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-  await loadAll();
+
+  try {
+    await loadAll();
+  } catch(e) {
+    console.warn('Data load error:', e.message);
+  }
+
   renderDashboard();
   calcBlend();
   toast('Welcome back, ' + name.split(' ')[0] + '!', 'success');
@@ -1968,6 +2058,9 @@ document.addEventListener('keydown', e => {
 // INIT — check existing session first
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  // Test DB connection and show status on login screen
+  testConnection();
+
   // Check if user already has an active session (e.g. page refresh)
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
