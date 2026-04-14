@@ -694,6 +694,17 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
   </div>
 </div>
 
+<!-- Creator Options Modal (shown after release/invoice save) -->
+<div class="mo" id="m-creator-options">
+  <div class="md" style="max-width:480px">
+    <div class="mh">
+      <span class="mt">Document Options</span>
+      <button class="mc" onclick="closeModal('m-creator-options')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="mb" id="creator-options-body"></div>
+  </div>
+</div>
+
 <!-- Confirm Delete -->
 <div class="mo" id="m-confirm">
   <div class="md" style="max-width:360px">
@@ -1277,7 +1288,17 @@ function renderReports() {
       <div style="width:38px;height:38px;background:${r.color};border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
       <div style="font-weight:700;color:var(--ink);margin-bottom:4px">${r.label}</div>
       <div class="txs tmut mb3">${r.desc}</div>
-      <button class="btn btn-o btn-sm" onclick="exportCSV('${r.fn}')">Download CSV</button>
+      <div class="flex gap2" style="flex-wrap:wrap">
+        <button class="btn btn-o btn-sm" onclick="exportCSV('${r.fn}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>CSV
+        </button>
+        <button class="btn btn-p btn-sm" onclick="printReport('${r.fn}','${r.label}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>Print
+        </button>
+        <button class="btn btn-b btn-sm" onclick="downloadReportPDF('${r.fn}','${r.label}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>PDF
+        </button>
+      </div>
     </div>`).join('');
 }
 
@@ -1881,11 +1902,13 @@ async function saveCRUD() {
 
   showSpinner('Saving…');
   try {
-    let err;
+    let err, savedData;
     if (_crudRecord?.id) {
       ({error:err} = await sb.from(tbl).update(payload).eq('id',_crudRecord.id));
     } else {
-      ({error:err} = await sb.from(tbl).insert(payload));
+      const result = await sb.from(tbl).insert(payload).select().single();
+      err = result.error;
+      savedData = result.data;
     }
     if (err) throw err;
     await logAction(_crudRecord?.id?'Updated':'Created', type, payload.name||payload.release_no||payload.invoice_no||'');
@@ -1893,13 +1916,293 @@ async function saveCRUD() {
     await loadAll();
     renderPage(currentPage());
     toast((_crudRecord?.id?'Updated':'Created')+' successfully','success');
+
+    // After new release order — notify authoriser + offer creator print options
+    if (type === 'release' && !_crudRecord?.id && savedData) {
+      await notifyAuthorisers(savedData, payload);
+      setTimeout(() => showCreatorOptions('release', savedData, payload), 600);
+    }
+
+    // After new invoice — offer print options
+    if (type === 'invoice' && !_crudRecord?.id && savedData) {
+      setTimeout(() => showCreatorOptions('invoice', savedData, payload), 600);
+    }
+
   } catch(e) { toast('Save failed: '+e.message,'error'); }
   hideSpinner();
 }
 
 // ═══════════════════════════════════════════
-// DELETE
+// NOTIFY AUTHORISERS after release creation
 // ═══════════════════════════════════════════
+async function notifyAuthorisers(savedRelease, payload) {
+  try {
+    // Get all users with approval permission (Manager / Super Admin roles)
+    const authorisers = DATA.users.filter(u => {
+      const perms = u.role?.permissions || {};
+      return perms.all || perms.approve;
+    });
+
+    if (!authorisers.length) {
+      toast('Release saved — no authoriser accounts found to notify', 'warning');
+      return;
+    }
+
+    // Get customer and product names for the notification
+    const custName = DATA.customers.find(c=>c.id===payload.customer_id)?.name || '—';
+    const prodName = DATA.products.find(p=>p.id===payload.product_id)?.name || '—';
+    const qty = (payload.quantity_requested||0).toLocaleString();
+    const relNo = payload.release_no || '';
+    const sord = payload.sord_number ? ` · SORD: ${payload.sord_number}` : '';
+
+    // Store in-app notification for each authoriser via audit_logs table
+    for (const auth of authorisers) {
+      await sb.from('audit_logs').insert({
+        action: 'APPROVAL_REQUIRED',
+        entity_type: 'release_orders',
+        entity_ref: relNo,
+        user_name: 'System',
+        new_values: JSON.stringify({
+          message: `Release ${relNo}${sord} for ${custName} — ${qty} L ${prodName} requires your approval.`,
+          release_id: savedRelease?.id,
+          release_no: relNo,
+          notify_user_id: auth.id,
+          created_by: _currentProfile?.full_name || _currentUser?.email
+        })
+      });
+    }
+
+    // Build mailto: for each authoriser's email
+    const emails = authorisers.map(u=>u.email).filter(Boolean);
+    if (emails.length) {
+      const subject = `[FlowTrack] Approval Required – ${relNo}`;
+      const body = `Dear Authoriser,\n\nA new Fuel Release Order has been created and requires your approval.\n\nRelease No: ${relNo}${sord}\nCustomer: ${custName}\nProduct: ${prodName}\nQuantity: ${qty} Litres\nDepot: ${DATA.sources.find(s=>s.id===payload.source_id)?.name||'—'}\nCreated By: ${_currentProfile?.full_name||_currentUser?.email||'System'}\n\nPlease log in to FlowTrack to review and approve or reject this release.\n\nhttps://flowtrak.netlify.app\n\nFlowTrack Petroleum Intelligence`;
+      const mailto = `mailto:${emails.join(';')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Show notification option
+      const doEmail = confirm(`Release ${relNo} saved!\n\nSend email notification to ${authorisers.length} authoriser(s)?\n(${emails.join(', ')})`);
+      if (doEmail) {
+        window.location.href = mailto;
+        toast(`Notification email opened for ${authorisers.length} authoriser(s)`, 'success');
+      } else {
+        toast(`Release saved. Authorisers can see it in the Approvals tab.`, 'info');
+      }
+    } else {
+      toast('Release saved. No authoriser email addresses found — notify them manually.', 'warning');
+    }
+  } catch(e) {
+    console.warn('Notification error:', e.message);
+    toast('Release saved. Could not send notification: '+e.message, 'warning');
+  }
+}
+
+// ═══════════════════════════════════════════
+// SHOW CREATOR OPTIONS after release/invoice save
+// ═══════════════════════════════════════════
+function showCreatorOptions(docType, savedRecord, payload) {
+  openModal('m-creator-options');
+  const body = document.getElementById('creator-options-body');
+  if (!body) return;
+
+  if (docType === 'release') {
+    // Release order options
+    body.innerHTML = `
+      <div class="al al-s mb4">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Release Order <strong>${payload.release_no}</strong> saved successfully!
+      </div>
+      <div class="st mb2" style="font-size:.85rem">What would you like to do next?</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');previewAndPrintRelease('${payload.release_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+          <div><div style="font-weight:600">Print Release Form</div><div class="txs tmut">For manual authorisation — take to signatory</div></div>
+        </button>
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');downloadReleaseFormPDF('${payload.release_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>
+          <div><div style="font-weight:600">Download PDF</div><div class="txs tmut">Save as PDF for email or WhatsApp</div></div>
+        </button>
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');previewAndEmailRelease('${payload.release_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          <div><div style="font-weight:600">Email Release Form</div><div class="txs tmut">Send to customer or transporter</div></div>
+        </button>
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');nav('approvals')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          <div><div style="font-weight:600">Go to Approvals</div><div class="txs tmut">View pending approvals dashboard</div></div>
+        </button>
+        <button class="btn btn-ghost" onclick="closeModal('m-creator-options')">Close — I'll do this later</button>
+      </div>`;
+  } else if (docType === 'invoice') {
+    body.innerHTML = `
+      <div class="al al-s mb4">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Invoice <strong>${payload.invoice_no}</strong> saved successfully!
+      </div>
+      <div class="st mb2" style="font-size:.85rem">What would you like to do next?</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');previewAndPrintInvoice('${payload.invoice_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+          <div><div style="font-weight:600">Print Invoice</div><div class="txs tmut">Physical copy for records</div></div>
+        </button>
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');downloadInvoicePDF('${payload.invoice_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>
+          <div><div style="font-weight:600">Download PDF</div><div class="txs tmut">Save as PDF for email or WhatsApp</div></div>
+        </button>
+        <button class="btn btn-o" style="justify-content:flex-start;padding:12px 16px" onclick="closeModal('m-creator-options');previewAndEmailInvoice('${payload.invoice_no}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          <div><div style="font-weight:600">Email Invoice</div><div class="txs tmut">Send directly to customer</div></div>
+        </button>
+        <button class="btn btn-ghost" onclick="closeModal('m-creator-options')">Close — I'll do this later</button>
+      </div>`;
+  }
+}
+
+// Quick print/download helpers called from creator options
+function previewAndPrintRelease(releaseNo) {
+  const r = DATA.releases.find(x=>x.release_no===releaseNo);
+  if (r) { viewRelease(r.id); setTimeout(()=>printDoc('pf-rf'), 800); }
+}
+function downloadReleaseFormPDF(releaseNo) {
+  const r = DATA.releases.find(x=>x.release_no===releaseNo);
+  if (r) { viewRelease(r.id); setTimeout(()=>dlPDF('pf-rf','release-'+releaseNo), 800); }
+}
+function previewAndEmailRelease(releaseNo) {
+  const r = DATA.releases.find(x=>x.release_no===releaseNo);
+  if (r) { viewRelease(r.id); setTimeout(()=>openEmailModal('release'), 500); }
+}
+function previewAndPrintInvoice(invNo) {
+  const inv = DATA.invoices.find(x=>x.invoice_no===invNo);
+  if (inv) { viewInvoice(inv.id); setTimeout(()=>printDoc('pf-inv'), 800); }
+}
+function downloadInvoicePDF(invNo) {
+  const inv = DATA.invoices.find(x=>x.invoice_no===invNo);
+  if (inv) { viewInvoice(inv.id); setTimeout(()=>dlPDF('pf-inv','invoice-'+invNo), 800); }
+}
+function previewAndEmailInvoice(invNo) {
+  const inv = DATA.invoices.find(x=>x.invoice_no===invNo);
+  if (inv) { viewInvoice(inv.id); setTimeout(()=>openEmailModal('invoice'), 500); }
+}
+
+// ═══════════════════════════════════════════
+// REPORT PRINT & PDF
+// ═══════════════════════════════════════════
+function getReportRows(type) {
+  const csvData = {
+    stock: {heads:['Source','Product','Balance (L)','Reserved','Available','Reorder','Status'],rows:DATA.stock.map(s=>[(s.source?.name||''),(s.product?.name||''),s.current_balance||0,s.reserved_quantity||0,(s.current_balance||0)-(s.reserved_quantity||0),s.reorder_level||0,(s.current_balance||0)<=(s.reorder_level||0)?'LOW STOCK':'OK'])},
+    releases: {heads:['Release No','SORD No','Date','Customer','Product','Qty Auth (L)','Released (L)','Balance (L)','Total (USD)','Truck','Status'],rows:DATA.releases.map(r=>[r.release_no,r.sord_number||'',r.release_date,r.customer?.name||'',r.product?.name||'',r.quantity_requested||0,r.quantity_released||0,(r.quantity_requested||0)-(r.quantity_released||0),r.total_amount||0,r.truck_registration||'',r.status])},
+    invoices: {heads:['Invoice No','Date','Customer','Product','Qty (L)','Total (USD)','Paid (USD)','Balance (USD)','Status'],rows:DATA.invoices.map(i=>[i.invoice_no,i.invoice_date,i.customer?.name||'',i.product?.name||'',i.quantity||0,i.total_amount||0,i.amount_paid||0,i.balance_due||0,i.status])},
+    suppliers: {heads:['Type','Supplier','Invoice Ref','Product','Ordered (L)','Balance (L)','Value (USD)','Status'],rows:DATA.suppliers.map(s=>[s.supply_type||'Local',s.supplier_name||'',s.invoice_number||'',s.product?.name||'',s.quantity_ordered||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.total_amount||0,s.status])},
+    blends: {heads:['Ref','Date','Ratio','Base Qty (L)','Additive (L)','Output (L)','Cost/L (USD)'],rows:DATA.blends.map(b=>[b.blend_ref,b.blend_date,b.blend_ratio+'%',b.base_quantity||0,b.additive_quantity||0,b.output_quantity||0,b.cost_per_litre||0])},
+    stations: {heads:['Station','Type','Province','Capacity (L)','Status'],rows:DATA.sites.map(s=>[s.name,s.type,s.province?.name||'',s.tank_capacity||0,s.is_active?'Active':'Inactive'])},
+    trucks: {heads:['Reg No','Transporter','Capacity (L)','Compartments','Driver','Status'],rows:DATA.trucks.map(t=>[t.registration_no,t.transporter?.name||'',t.max_capacity_litres||0,t.compartments||0,t.default_driver||'',t.is_active!==false?'Active':'Inactive'])},
+    sector_product: null,
+    province_product: null,
+    local_import: null
+  };
+  return csvData[type] || null;
+}
+
+function buildReportHTML(type, label) {
+  const cfg = getReportRows(type);
+  let tableHTML = '';
+  if (cfg) {
+    tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead><tr>${cfg.heads.map(h=>`<th style="background:#0a0f1e;color:#fff;padding:7px 10px;text-align:left;font-size:9px;text-transform:uppercase">${h}</th>`).join('')}</tr></thead>
+      <tbody>${cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#f9fafb':'#fff'}">${r.map(c=>`<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${c}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>`;
+  } else {
+    // For computed reports (sector_product, province_product, local_import), export as CSV text
+    const rows = exportCSVGetRows(type);
+    tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:10px">
+      ${rows.map((r,i)=>`<tr style="background:${i===0?'#0a0f1e':i%2?'#f9fafb':'#fff'}">${r.map(c=>`<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;color:${i===0?'#fff':'#111'};font-weight:${i===0?700:400}">${c}</td>`).join('')}</tr>`).join('')}
+    </table>`;
+  }
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>FlowTrack – ${label}</title>
+  <style>body{font-family:Arial,sans-serif;margin:20px;color:#111;font-size:11px}
+  .hdr{display:flex;justify-content:space-between;border-bottom:3px solid #0a0f1e;padding-bottom:10px;margin-bottom:14px}
+  .co{font-size:18px;font-weight:800;color:#0a0f1e}.dt{font-size:14px;font-weight:800;color:#e85d26;text-align:right}
+  .meta{font-size:9px;color:#666;text-align:right;margin-top:3px}
+  .foot{margin-top:16px;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px;text-align:center}</style>
+  </head><body>
+  <div class="hdr"><div><div class="co">FlowTrack</div><div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.06em">Petroleum Intelligence Platform</div></div>
+  <div><div class="dt">${label}</div><div class="meta">Generated: ${new Date().toLocaleString()}<br>Records: ${DATA.releases.length} releases · ${DATA.customers.length} customers</div></div></div>
+  ${tableHTML}
+  <div class="foot">FlowTrack Petroleum Intelligence · Harare, Zimbabwe · This report is computer-generated</div>
+  </body></html>`;
+}
+
+function exportCSVGetRows(type) {
+  // For computed reports — return the row arrays
+  const all = {
+    sector_product: (()=>{
+      const sectors=[...new Set(DATA.customers.map(c=>c.sector?.name||'Unknown'))].sort();
+      const products=[...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
+      const rows=[['Sector',...products,'Total (L)']];
+      sectors.forEach(sec=>{const ids=DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec).map(c=>c.id);const rels=DATA.releases.filter(r=>ids.includes(r.customer_id));const row=[sec];let tot=0;products.forEach(p=>{const v=rels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);row.push(v);tot+=v;});row.push(tot);rows.push(row);});return rows;
+    })(),
+    province_product: (()=>{
+      const provs=[...new Set(DATA.customers.map(c=>c.province?.name||'Unknown'))].sort();
+      const products=[...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
+      const rows=[['Province',...products,'Total (L)']];
+      provs.forEach(prov=>{const ids=DATA.customers.filter(c=>(c.province?.name||'Unknown')===prov).map(c=>c.id);const rels=DATA.releases.filter(r=>ids.includes(r.customer_id));const row=[prov];let tot=0;products.forEach(p=>{const v=rels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);row.push(v);tot+=v;});row.push(tot);rows.push(row);});return rows;
+    })(),
+    local_import: (()=>{
+      const local=DATA.suppliers.filter(s=>s.supply_type!=='Import');
+      const imports=DATA.suppliers.filter(s=>s.supply_type==='Import');
+      const rows=[['Supply Type','Supplier','Product','Ordered (L)','Drawn (L)','Balance (L)','Value (USD)','Status']];
+      [...local,...imports].forEach(s=>{rows.push([s.supply_type||'Local',s.supplier_name||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.total_amount||0,s.status||'']);});
+      rows.push([]);
+      rows.push(['SUMMARY — Local','','',' '+local.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+local.reduce((s,x)=>s+(x.total_amount||0),0),'']);
+      rows.push(['SUMMARY — Import','','',' '+imports.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+imports.reduce((s,x)=>s+(x.total_amount||0),0),'']);
+      return rows;
+    })()
+  };
+  return all[type] || [];
+}
+
+function printReport(type, label) {
+  const html = buildReportHTML(type, label);
+  const w = window.open('','','width=1000,height=700');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 500);
+}
+
+async function downloadReportPDF(type, label) {
+  showSpinner('Generating PDF…');
+  try {
+    const html = buildReportHTML(type, label);
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1050px;height:800px;border:none;opacity:0;pointer-events:none';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    await new Promise(r=>setTimeout(r,700));
+    if (window.html2canvas && window.jspdf) {
+      const canvas = await html2canvas(iframe.contentDocument.body,{scale:1.8,backgroundColor:'#fff',windowWidth:1050,useCORS:true});
+      document.body.removeChild(iframe);
+      const {jsPDF} = window.jspdf;
+      const pdf = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+      const idat = canvas.toDataURL('image/png');
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph_canvas = (canvas.height*pw)/canvas.width;
+      const pageH = pdf.internal.pageSize.getHeight();
+      let pg=0,rem=ph_canvas;
+      while(rem>0){if(pg>0)pdf.addPage();pdf.addImage(idat,'PNG',0,-pg*pageH,pw,ph_canvas);rem-=pageH;pg++;}
+      pdf.save(`FlowTrack-${type}-${today()}.pdf`);
+      toast(`${label} PDF downloaded`,'success');
+    } else {
+      document.body.removeChild(iframe);
+      const blob = new Blob([html],{type:'text/html'});
+      const a = document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`FlowTrack-${type}-${today()}.html`;
+      a.click();
+      toast('Report downloaded as HTML — open in browser and Print → Save as PDF','success');
+    }
+  } catch(e) { toast('PDF error: '+e.message,'error'); }
+  hideSpinner();
+}
 let _delTable, _delId, _delName;
 function confirmDelete(table, id, name) {
   _delTable=table; _delId=id; _delName=name;
