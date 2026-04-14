@@ -18,6 +18,16 @@ if (!window.supabase) {
     if (e) { e.textContent = 'Failed to load Supabase library. Please hard-refresh (Ctrl+Shift+R).'; e.classList.add('on'); }
   });
 }
+
+// Clear any cached Supabase session tokens from localStorage
+// so the login screen is always shown on page load
+try {
+  Object.keys(localStorage).forEach(function(key) {
+    if (key.startsWith('sb-') || key.includes('supabase')) {
+      localStorage.removeItem(key);
+    }
+  });
+} catch(e) {}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
@@ -737,8 +747,8 @@ function getSB() {
     if (window.supabase && window.supabase.createClient) {
       sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
         auth: {
-          autoRefreshToken: true,
-          persistSession: true,
+          autoRefreshToken: false,
+          persistSession: false,
           detectSessionInUrl: false
         }
       });
@@ -2832,15 +2842,15 @@ document.addEventListener('keydown', e => {
 // INIT — check existing session first
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize Supabase client NOW — library is guaranteed loaded at this point
+  // Initialize Supabase client
   try {
     if (!window.supabase || !window.supabase.createClient) {
-      throw new Error('Supabase library failed to load. Check your internet connection and reload the page.');
+      throw new Error('Supabase library failed to load. Please hard-refresh (Ctrl+Shift+R).');
     }
     sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
       auth: {
-        autoRefreshToken: true,
-        persistSession: true,
+        autoRefreshToken: false,
+        persistSession: false,
         detectSessionInUrl: false
       }
     });
@@ -2852,31 +2862,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  // Always clear any cached session and show login screen
+  // Users must explicitly sign in every time
+  try { await sb.auth.signOut(); } catch(e) {}
+
   // Test DB connection and show status on login screen
   testConnection();
 
-  // Check if user already has an active session (e.g. page refresh)
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    _currentUser = session.user;
-    await onSignedIn();
-  } else {
-    showLoginScreen();
-  }
+  // Always show login — no auto-restore
+  showLoginScreen();
 
-  // Listen for auth state changes (e.g. password reset redirect)
+  // Listen for password reset redirects only
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
       const newPass = prompt('Enter your new password (min 6 characters):');
       if (newPass && newPass.length >= 6) {
         const { error } = await sb.auth.updateUser({ password: newPass });
-        if (!error) toast('Password updated successfully. Please sign in.', 'success');
+        if (!error) toast('Password updated. Please sign in with your new password.', 'success');
         else toast('Error: ' + error.message, 'error');
       }
       await sb.auth.signOut();
       showLoginScreen();
     }
-    if (event === 'SIGNED_OUT') { showLoginScreen(); }
   });
 });
 </script>
