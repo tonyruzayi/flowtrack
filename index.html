@@ -1937,8 +1937,9 @@ async function saveCRUD() {
       expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes')};
   }
 
-  if (!payload.name && type!=='release'&&type!=='drawdown'&&type!=='invoice'&&type!=='supplier'&&type!=='truck') {
-    toast('Name / required field is empty','warning'); return;
+  if (!payload.name && !payload.full_name && !payload.release_no && !payload.invoice_no &&
+      !payload.supplier_name && !payload.registration_no && !payload.release_order_id) {
+    toast('Please fill in all required fields','warning'); return;
   }
 
   showSpinner('Saving…');
