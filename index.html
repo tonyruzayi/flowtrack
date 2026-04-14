@@ -1866,7 +1866,63 @@ async function saveCRUD() {
   }
   else if (type==='province') payload = {name:g('f-name')};
   else if (type==='sector') payload = {name:g('f-name'),description:g('f-desc')};
-  else if (type==='user') payload = {full_name:g('f-name'),email:g('f-email'),phone:g('f-phone'),department:g('f-dept'),role_id:g('f-role')||null,is_active:gb('f-active')};
+  else if (type==='user') {
+    const email = g('f-email');
+    const fullName = g('f-name');
+    if (!email) { toast('Email address is required','warning'); return; }
+    if (!fullName) { toast('Full name is required','warning'); return; }
+
+    showSpinner('Creating user…');
+    try {
+      if (_crudRecord?.id) {
+        // Edit existing — just update the profile row
+        const {error} = await sb.from('user_profiles').update({
+          full_name:fullName, phone:g('f-phone'),
+          department:g('f-dept'), role_id:g('f-role')||null,
+          is_active:gb('f-active'), email:email
+        }).eq('id', _crudRecord.id);
+        if (error) throw error;
+        await logAction('Updated','user',fullName);
+        closeModal('m-crud');
+        await loadAll(); renderPage(currentPage());
+        toast('User updated successfully','success');
+      } else {
+        // New user — must create in Supabase Auth first via Admin API
+        // Since we don't have admin key, use signUp with a temp password and prompt user to reset
+        const tempPassword = 'FlowTrack@'+Math.floor(1000+Math.random()*9000);
+        const {data:authData, error:authErr} = await sb.auth.signUp({
+          email: email,
+          password: tempPassword,
+          options: { data: { full_name: fullName } }
+        });
+        if (authErr) throw new Error('Auth signup failed: '+authErr.message);
+        if (!authData?.user?.id) throw new Error('No user ID returned from signup');
+
+        // Insert profile with the auth user's UUID
+        const {error:profErr} = await sb.from('user_profiles').upsert({
+          id: authData.user.id,
+          full_name: fullName,
+          email: email,
+          phone: g('f-phone'),
+          department: g('f-dept'),
+          role_id: g('f-role')||null,
+          is_active: gb('f-active')
+        });
+        if (profErr) throw new Error('Profile insert failed: '+profErr.message);
+
+        await logAction('Created','user',fullName);
+        closeModal('m-crud');
+        await loadAll(); renderPage(currentPage());
+        toast(`User "${fullName}" created! Temporary password: ${tempPassword} — ask them to reset it on first login.`, 'success');
+        // Show temp password prominently
+        alert(`User created successfully!\n\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease share this password securely with the user and ask them to change it after first login.\n\n(You can also send a password reset from Supabase → Authentication → Users)`);
+      }
+    } catch(e) {
+      toast('Save failed: '+e.message,'error');
+    }
+    hideSpinner();
+    return; // Skip the generic save block below
+  }
   else if (type==='role') { let perms={}; try{perms=JSON.parse(g('f-perms')||'{}')}catch(e){} payload={name:g('f-name'),description:g('f-desc'),permissions:perms}; }
   else if (type==='release') {
     const qty=gn('f-qty')||0, price=gn('f-price')||0;
