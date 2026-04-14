@@ -1498,7 +1498,15 @@ function actBtns(type, id, name) {
 }
 
 function tableFor(type) {
-  const m = {customer:'customers',product:'products',depot:'sources',source:'sources',station:'sites',transporter:'transporters',truck:'trucks',province:'provinces',sector:'sectors',user:'user_profiles',role:'roles'};
+  const m = {
+    customer:'customers', product:'products',
+    depot:'sources', source:'sources',
+    station:'sites', transporter:'transporters', truck:'trucks',
+    province:'provinces', sector:'sectors',
+    user:'user_profiles', role:'roles',
+    release:'release_orders', drawdown:'release_drawdowns',
+    invoice:'invoices', supplier:'supplier_purchases'
+  };
   return m[type] || type;
 }
 
