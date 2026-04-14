@@ -1877,11 +1877,30 @@ async function saveCRUD() {
     const qty=gn('f-qty')||0, price=gn('f-price')||0;
     const truckSel = document.getElementById('f-truck');
     const truckReg = truckSel ? truckSel.value : g('f-truck');
-    payload={release_no:g('f-relno'),sord_number:g('f-sord'),release_date:g('f-date'),customer_id:g('f-cust')||null,source_id:g('f-src')||null,product_id:g('f-prod')||null,quantity_requested:qty,quantity_released:gn('f-qtyrel')||(_crudRecord?.quantity_released||0),unit_price:price,total_amount:qty*price,transporter_id:g('f-trans')||null,truck_registration:truckReg,trailer_registration:g('f-trailer'),driver_name:g('f-driver'),driver_id_no:g('f-driverid'),signatory:g('f-signatory'),signatory_title:g('f-sig-title'),status:g('f-status')||'Draft',notes:g('f-notes')};
+    if (!g('f-cust')) { toast('Please select a Customer','warning'); return; }
+    if (!g('f-src'))  { toast('Please select a Source Depot','warning'); return; }
+    if (!g('f-prod')) { toast('Please select a Product','warning'); return; }
+    if (!qty)         { toast('Please enter a Quantity','warning'); return; }
+    payload={release_no:g('f-relno'),sord_number:g('f-sord'),release_date:g('f-date'),
+      customer_id:g('f-cust')||null,source_id:g('f-src')||null,product_id:g('f-prod')||null,
+      quantity_requested:qty,quantity_released:gn('f-qtyrel')||(_crudRecord?.quantity_released||0),
+      unit_price:price,total_amount:qty*price,transporter_id:g('f-trans')||null,
+      truck_registration:truckReg,trailer_registration:g('f-trailer'),
+      driver_name:g('f-driver'),driver_id_no:g('f-driverid'),
+      signatory:g('f-signatory'),signatory_title:g('f-sig-title'),
+      status:g('f-status')||'Draft',notes:g('f-notes'),
+      created_by:_currentUser?.id||null};
   }
   else if (type==='drawdown') {
     const truckSel = document.getElementById('f-truck');
-    payload={release_order_id:g('f-rel')||null,drawdown_date:g('f-date'),quantity:gn('f-qty'),truck_registration:truckSel?truckSel.value:g('f-truck'),driver_name:g('f-driver'),driver_phone:g('f-driverph'),compartments_used:gn('f-comps'),collection_ref:g('f-cref'),collected_by:g('f-colby'),notes:g('f-notes')};
+    if (!g('f-rel')) { toast('Please select a Release Order','warning'); return; }
+    if (!gn('f-qty')){ toast('Please enter a Quantity to draw','warning'); return; }
+    payload={release_order_id:g('f-rel')||null,drawdown_date:g('f-date'),
+      quantity:gn('f-qty'),truck_registration:truckSel?truckSel.value:g('f-truck'),
+      driver_name:g('f-driver'),driver_phone:g('f-driverph'),
+      compartments_used:gn('f-comps'),collection_ref:g('f-cref'),
+      collected_by:g('f-colby'),notes:g('f-notes'),
+      created_by:_currentUser?.id||null};
     // After saving drawdown, update release quantity_released
     if (payload.release_order_id && payload.quantity) {
       const rel = DATA.releases.find(r=>r.id===payload.release_order_id);
@@ -1890,13 +1909,12 @@ async function saveCRUD() {
         const newStatus = newReleased >= (rel.quantity_requested||0) ? 'Completed' : 'Partial';
         setTimeout(async()=>{
           await sb.from('release_orders').update({quantity_released:newReleased,status:newStatus}).eq('id',payload.release_order_id);
-          // Also update stock level
           if (rel.source_id && rel.product_id) {
             const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',rel.source_id).eq('product_id',rel.product_id).maybeSingle();
             if (sl) {
               const newBal = Math.max(0,(sl.current_balance||0)-payload.quantity);
               await sb.from('stock_levels').update({current_balance:newBal,last_updated:new Date().toISOString()}).eq('id',sl.id);
-              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no});
+              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no,created_by:_currentUser?.id||null});
             }
           }
           await loadAll(); renderPage(currentPage());
@@ -1907,11 +1925,23 @@ async function saveCRUD() {
   else if (type==='invoice') {
     const qty=gn('f-qty')||0,price=gn('f-price')||0,vatR=gn('f-vat')||0,paid=gn('f-paid')||0;
     const sub=qty*price, vatA=sub*vatR/100, tot=sub+vatA, bal=tot-paid;
-    payload={invoice_no:g('f-invno'),invoice_date:g('f-date'),due_date:g('f-due')||null,customer_id:g('f-cust')||null,release_order_id:g('f-rel')||null,product_id:g('f-prod')||null,quantity:qty,unit_price:price,subtotal:sub,vat_rate:vatR,vat_amount:vatA,total_amount:tot,amount_paid:paid,balance_due:bal,status:g('f-status')||'Draft',notes:g('f-notes')};
+    if (!g('f-cust')) { toast('Please select a Customer','warning'); return; }
+    payload={invoice_no:g('f-invno'),invoice_date:g('f-date'),due_date:g('f-due')||null,
+      customer_id:g('f-cust')||null,release_order_id:g('f-rel')||null,
+      product_id:g('f-prod')||null,quantity:qty,unit_price:price,subtotal:sub,
+      vat_rate:vatR,vat_amount:vatA,total_amount:tot,amount_paid:paid,balance_due:bal,
+      status:g('f-status')||'Draft',notes:g('f-notes'),
+      created_by:_currentUser?.id||null};
   }
   else if (type==='supplier') {
     const qty=gn('f-qty')||0,price=gn('f-price')||0;
-    payload={supplier_name:g('f-name'),supply_type:g('f-suptype')||'Local',invoice_number:g('f-ref'),invoice_date:g('f-date'),product_id:g('f-prod')||null,source_id:g('f-src')||null,quantity_ordered:qty,unit_price:price,total_amount:qty*price,expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes')};
+    if (!g('f-name')) { toast('Please enter a Supplier Name','warning'); return; }
+    payload={supplier_name:g('f-name'),supply_type:g('f-suptype')||'Local',
+      invoice_number:g('f-ref'),invoice_date:g('f-date'),
+      product_id:g('f-prod')||null,source_id:g('f-src')||null,
+      quantity_ordered:qty,unit_price:price,total_amount:qty*price,
+      expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes'),
+      created_by:_currentUser?.id||null};
   }
 
   if (!payload.name && type!=='release'&&type!=='drawdown'&&type!=='invoice'&&type!=='supplier'&&type!=='truck') {
