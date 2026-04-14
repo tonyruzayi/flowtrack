@@ -1708,8 +1708,12 @@ const FORMS = {
     return `<div class="fgrid">
     <div class="fg"><label>Truck Registration No. *</label><input class="inp" id="f-regno" value="${d.registration_no||''}" placeholder="e.g. AEZ 1234"/></div>
     <div class="fg"><label>Trailer Registration No.</label><input class="inp" id="f-trailer" value="${d.trailer_reg||''}" placeholder="e.g. AEZ 1234T (if any)"/></div>
-    <div class="fg full"><label>Transporter Name *</label><input class="inp" id="f-transname" value="${d.transporter_name||''}" placeholder="Type transporter company name" list="trans-list"/>
-      <datalist id="trans-list">${DATA.transporters.map(t=>`<option value="${t.name}" data-id="${t.id}">`).join('')}</datalist>
+    <div class="fg full"><label>Transporter *</label>
+      <select class="sel" id="f-transid">
+        <option value="">— Select Transporter —</option>
+        ${DATA.transporters.map(t=>`<option value="${t.id}" ${d.transporter_id===t.id?'selected':''}>${t.name}</option>`).join('')}
+      </select>
+      <div class="txs tmut mt2">Transporter not listed? <a onclick="openCRUD('transporter',null)" style="color:var(--brand);cursor:pointer">Add new transporter first</a>, then come back to add the truck.</div>
     </div>
     <div class="fg"><label>Default Driver Name</label><input class="inp" id="f-driver" value="${d.default_driver||''}"/></div>
     <div class="fg"><label>Driver ID No.</label><input class="inp" id="f-driverid" value="${d.driver_id_no||''}"/></div>
@@ -1842,29 +1846,20 @@ async function saveCRUD() {
   else if (type==='station') payload = {name:g('f-name'),type:g('f-type'),address:g('f-addr'),province_id:g('f-prov')||null,manager_name:g('f-mgr'),phone:g('f-phone'),tank_capacity:gn('f-cap'),reorder_level:gn('f-reorder'),is_company_owned:gb('f-owned'),is_active:gb('f-active')};
   else if (type==='transporter') payload = {name:g('f-name'),contact_person:g('f-contact'),phone:g('f-phone'),email:g('f-email'),is_active:gb('f-active')};
   else if (type==='truck') {
-    // Resolve transporter name to ID
-    const transName = g('f-transname') || '';
-    let transId = null;
-    const matchedTrans = DATA.transporters.find(t => t.name.toLowerCase() === transName.toLowerCase());
-    if (matchedTrans) {
-      transId = matchedTrans.id;
-    } else if (transName) {
-      // Create new transporter on the fly
-      const {data:newTrans} = await sb.from('transporters').insert({name:transName,is_active:true}).select().single();
-      if (newTrans) { transId = newTrans.id; DATA.transporters.push(newTrans); }
-    }
-    // Collect compartments
+    const transId = g('f-transid') || null;
+    const transName = DATA.transporters.find(t=>t.id===transId)?.name || '';
     const compEls = document.querySelectorAll('[id^="comp-vol-"]');
     const comps = Array.from(compEls).map((el,i)=>({num:i+1,vol:parseFloat(el.value)||0})).filter(c=>c.vol>0);
     const totalCap = comps.reduce((s,c)=>s+c.vol,0);
     if (!g('f-regno')) { toast('Truck Registration No. is required','warning'); hideSpinner(); return; }
-    if (!transId) { toast('Please enter a Transporter name','warning'); hideSpinner(); return; }
+    if (!transId) { toast('Please select a Transporter','warning'); hideSpinner(); return; }
     payload = {
       registration_no:g('f-regno'), trailer_reg:g('f-trailer'),
       transporter_id:transId, transporter_name:transName,
       default_driver:g('f-driver'), driver_id_no:g('f-driverid'),
       driver_phone:g('f-driverph'),
-      compartments:comps.length, compartments_detail:JSON.stringify(comps),
+      compartments:comps.length||null,
+      compartments_detail:comps.length?JSON.stringify(comps):null,
       max_capacity_litres:totalCap||null,
       notes:g('f-notes'), is_active:gb('f-active')
     };
@@ -1888,8 +1883,7 @@ async function saveCRUD() {
       truck_registration:truckReg,trailer_registration:g('f-trailer'),
       driver_name:g('f-driver'),driver_id_no:g('f-driverid'),
       signatory:g('f-signatory'),signatory_title:g('f-sig-title'),
-      status:g('f-status')||'Draft',notes:g('f-notes'),
-      created_by:_currentUser?.id||null};
+      status:g('f-status')||'Draft',notes:g('f-notes')};
   }
   else if (type==='drawdown') {
     const truckSel = document.getElementById('f-truck');
@@ -1899,8 +1893,7 @@ async function saveCRUD() {
       quantity:gn('f-qty'),truck_registration:truckSel?truckSel.value:g('f-truck'),
       driver_name:g('f-driver'),driver_phone:g('f-driverph'),
       compartments_used:gn('f-comps'),collection_ref:g('f-cref'),
-      collected_by:g('f-colby'),notes:g('f-notes'),
-      created_by:_currentUser?.id||null};
+      collected_by:g('f-colby'),notes:g('f-notes')};
     // After saving drawdown, update release quantity_released
     if (payload.release_order_id && payload.quantity) {
       const rel = DATA.releases.find(r=>r.id===payload.release_order_id);
@@ -1914,7 +1907,7 @@ async function saveCRUD() {
             if (sl) {
               const newBal = Math.max(0,(sl.current_balance||0)-payload.quantity);
               await sb.from('stock_levels').update({current_balance:newBal,last_updated:new Date().toISOString()}).eq('id',sl.id);
-              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no,created_by:_currentUser?.id||null});
+              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no});
             }
           }
           await loadAll(); renderPage(currentPage());
@@ -1930,18 +1923,18 @@ async function saveCRUD() {
       customer_id:g('f-cust')||null,release_order_id:g('f-rel')||null,
       product_id:g('f-prod')||null,quantity:qty,unit_price:price,subtotal:sub,
       vat_rate:vatR,vat_amount:vatA,total_amount:tot,amount_paid:paid,balance_due:bal,
-      status:g('f-status')||'Draft',notes:g('f-notes'),
-      created_by:_currentUser?.id||null};
+      status:g('f-status')||'Draft',notes:g('f-notes')};
   }
   else if (type==='supplier') {
     const qty=gn('f-qty')||0,price=gn('f-price')||0;
     if (!g('f-name')) { toast('Please enter a Supplier Name','warning'); return; }
+    const supRef = g('f-ref') || ('PO-'+Date.now());
     payload={supplier_name:g('f-name'),supply_type:g('f-suptype')||'Local',
-      invoice_number:g('f-ref'),invoice_date:g('f-date'),
+      reference_no:supRef,
+      invoice_number:supRef,invoice_date:g('f-date'),
       product_id:g('f-prod')||null,source_id:g('f-src')||null,
       quantity_ordered:qty,unit_price:price,total_amount:qty*price,
-      expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes'),
-      created_by:_currentUser?.id||null};
+      expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes')};
   }
 
   if (!payload.name && type!=='release'&&type!=='drawdown'&&type!=='invoice'&&type!=='supplier'&&type!=='truck') {
