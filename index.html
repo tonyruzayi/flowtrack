@@ -525,13 +525,13 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 <section class="page" id="page-releases">
   <div class="sh"><div><div class="st">Release Orders</div></div><div class="flex gap2"><button class="btn btn-o btn-sm" onclick="exportCSV('releases')">Export</button><button class="btn btn-b btn-sm" onclick="openCRUD('release',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>New Release</button></div></div>
   <div class="tabs"><div class="tab on" onclick="filterRel('all',this)">All</div><div class="tab" onclick="filterRel('Pending Approval',this)">Pending</div><div class="tab" onclick="filterRel('Approved',this)">Approved</div><div class="tab" onclick="filterRel('Partial',this)">Partial</div><div class="tab" onclick="filterRel('Completed',this)">Completed</div></div>
-  <div class="tw"><table><thead><tr><th>Release No</th><th>Date</th><th>Customer</th><th>Product</th><th>Source</th><th>Qty (L)</th><th>Released</th><th>Balance</th><th>Value (USD)</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rel-tbl"><tr><td colspan="11" class="empty">No release orders yet.</td></tr></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>Release No</th><th>SORD No.</th><th>Date</th><th>Customer</th><th>Product</th><th>Source</th><th>Qty (L)</th><th>Released</th><th>Balance</th><th>Truck / Trailer</th><th>Signatory</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rel-tbl"><tr><td colspan="13" class="empty">No release orders yet.</td></tr></tbody></table></div>
 </section>
 
 <!-- DRAWDOWNS / SORD TRACKER -->
 <section class="page" id="page-drawdowns">
   <div class="sh"><div><div class="st">SORD Tracker</div><div class="ss">Track collections against approved NOIC SORDs. Each drawdown reduces the SORD balance and updates stock levels automatically.</div></div><button class="btn btn-b btn-sm" onclick="openCRUD('drawdown',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Record Collection</button></div>
-  <div class="tw"><table><thead><tr><th>Release No</th><th>Date</th><th>Customer</th><th>Product</th><th>Qty Drawn (L)</th><th>Truck</th><th>Driver</th><th>Collection Ref</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="9" class="empty">No drawdowns recorded yet.</td></tr></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>Release No</th><th>SORD No.</th><th>Collection Date</th><th>Customer</th><th>Product</th><th>Qty Drawn (L)</th><th>SORD Balance (L)</th><th>Truck</th><th>Driver</th><th>Collection Ref</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="11" class="empty">No collections recorded yet.</td></tr></tbody></table></div>
 </section>
 
 <!-- APPROVALS -->
@@ -622,7 +622,13 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 
 <!-- NOTIFICATIONS -->
 <section class="page" id="page-notifications">
-  <div class="sh"><div class="st">Alerts & Notifications</div></div>
+  <div class="sh">
+    <div><div class="st">Notifications & Alerts</div><div class="ss">All pending actions and system alerts across all documents</div></div>
+    <button class="btn btn-o btn-sm" onclick="refreshNotifBadge();renderNotifs();toast('Refreshed','success')">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Refresh
+    </button>
+  </div>
+  <div class="g3 mb4" id="notif-summary"></div>
   <div id="notif-list"></div>
 </section>
 
@@ -889,6 +895,7 @@ async function loadAll() {
     DATA.users       = users       || [];
     DATA.roles       = roles       || [];
     DATA.audit       = audit       || [];
+    refreshNotifBadge();
 
     // Update badges
     const pendRel = DATA.releases.filter(r=>r.status==='Pending Approval').length;
@@ -1152,22 +1159,26 @@ function renderReleases(filter) {
   tbl.innerHTML = data.length ? data.map(r=>{
     const bal = (r.quantity_requested||0)-(r.quantity_released||0);
     return `<tr>
-      <td class="mono">${r.release_no}</td><td>${fmtDate(r.release_date)}</td>
-      <td class="tbld">${r.customer?.name||'—'}</td><td>${r.product?.name||'—'}</td>
+      <td class="mono tbld">${r.release_no}</td>
+      <td class="mono" style="color:var(--brand);font-weight:700">${r.sord_number||'—'}</td>
+      <td>${fmtDate(r.release_date)}</td>
+      <td class="tbld">${r.customer?.name||'—'}</td>
+      <td>${r.product?.name||'—'}</td>
       <td>${r.source?.name||'—'}</td>
-      <td>${fmt(r.quantity_requested||0)}</td>
+      <td style="font-weight:600">${fmt(r.quantity_requested||0)}</td>
       <td style="color:var(--em);font-weight:600">${fmt(r.quantity_released||0)}</td>
       <td style="color:var(--brand);font-weight:700">${fmt(bal)}</td>
-      <td>$${fmt(r.total_amount||0)}</td>
+      <td>${r.truck_registration||'—'}${r.trailer_registration?' / '+r.trailer_registration:''}</td>
+      <td>${r.signatory||'—'}</td>
       <td><span class="badge ${bm[r.status]||'bgr'}">${r.status}</span></td>
       <td><div class="flex gap2">
-        <button class="btn btn-g btn-sm btn-icon" onclick="viewRelease('${r.id}')" title="Release Form"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg></button>
+        <button class="btn btn-g btn-sm btn-icon" onclick="viewRelease('${r.id}')" title="View / Print Form"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg></button>
         <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('release','${r.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
-        ${r.status==='Pending Approval'?`<button class="btn btn-s btn-sm" onclick="doApprove('${r.id}')">✓</button>`:''}
+        ${r.status==='Pending Approval'||r.status==='Draft'?`<button class="btn btn-s btn-sm" onclick="doApprove('${r.id}')" title="Approve">✓</button>`:''}
         <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_orders','${r.id}','${r.release_no}')" title="Delete"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       </div></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="11" class="empty">No releases found.</td></tr>';
+  }).join('') : '<tr><td colspan="13" class="empty">No releases found.</td></tr>';
 }
 
 function addComp() {
@@ -1210,44 +1221,67 @@ function filterRel(s, el) {
 function renderDrawdowns() {
   const tbl = document.getElementById('dd-tbl');
   if (!tbl) return;
-  tbl.innerHTML = DATA.drawdowns.length ? DATA.drawdowns.map(d=>`<tr>
-    <td class="mono">${d.release_order?.release_no||'—'}</td>
-    <td>${fmtDate(d.drawdown_date)}</td>
-    <td class="tbld">${d.release_order?.customer?.name||'—'}</td>
-    <td>${d.release_order?.product?.name||'—'}</td>
-    <td style="font-weight:700;color:var(--brand)">${fmt(d.quantity||0)}</td>
-    <td>${d.truck_registration||'—'}</td>
-    <td>${d.driver_name||'—'}</td>
-    <td class="mono">${d.collection_ref||'—'}</td>
-    <td><button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_drawdowns','${d.id}','Drawdown')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
-  </tr>`).join('') : '<tr><td colspan="9" class="empty">No drawdowns recorded yet.</td></tr>';
+  tbl.innerHTML = DATA.drawdowns.length ? DATA.drawdowns.map(d=>{
+    const rel = DATA.releases.find(r=>r.id===d.release_order_id);
+    const sordBal = rel ? (rel.quantity_requested||0)-(rel.quantity_released||0) : null;
+    return `<tr>
+      <td class="mono tbld">${d.release_order?.release_no||rel?.release_no||'—'}</td>
+      <td class="mono" style="color:var(--brand);font-weight:700">${rel?.sord_number||'—'}</td>
+      <td>${fmtDate(d.drawdown_date)}</td>
+      <td>${d.release_order?.customer?.name||rel?.customer?.name||'—'}</td>
+      <td>${d.release_order?.product?.name||rel?.product?.name||'—'}</td>
+      <td style="font-weight:700;color:var(--em)">${fmt(d.quantity||0)}</td>
+      <td style="font-weight:700;color:${sordBal===0?'var(--em)':'var(--brand)'}">${sordBal!==null?fmt(sordBal)+' L':'—'} ${sordBal===0?'✓ Fully Drawn':''}</td>
+      <td class="mono">${d.truck_registration||'—'}</td>
+      <td>${d.driver_name||'—'}</td>
+      <td class="mono">${d.collection_ref||'—'}</td>
+      <td><button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_drawdowns','${d.id}','Collection')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="11" class="empty">No collections recorded yet.</td></tr>';
 }
 
 function renderApprovals() {
   const list = document.getElementById('approvals-list');
   if (!list) return;
-  const pend = DATA.releases.filter(r=>r.status==='Pending Approval');
+  const pend = DATA.releases.filter(r=>r.status==='Pending Approval'||r.status==='Draft');
   list.innerHTML = pend.length ? pend.map(r=>`
-    <div class="card mb4">
+    <div class="card mb4" style="border-left:4px solid var(--amb)">
       <div class="flex jsb aic mb4" style="flex-wrap:wrap;gap:8px">
-        <div><div style="font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800;color:var(--ink)">${r.release_no}</div><div class="txs tmut">Submitted: ${fmtDate(r.release_date)}</div></div>
-        <span class="badge ba">Pending Approval</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800;color:var(--ink)">${r.release_no}</div>
+          ${r.sord_number?`<div style="font-size:.75rem;color:var(--brand);font-weight:700;margin-top:2px">SORD: ${r.sord_number}</div>`:'<div style="font-size:.72rem;color:var(--mut);margin-top:2px">No SORD assigned yet</div>'}
+          <div class="txs tmut mt1">Submitted: ${fmtDate(r.release_date)}</div>
+        </div>
+        <span class="badge ba">${r.status}</span>
       </div>
-      <div class="g3 mb4" style="gap:12px">
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Customer</div><div class="tbld mt2">${r.customer?.name||'—'}</div></div>
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Product & Qty</div><div class="tbld mt2">${r.product?.name||'—'} · ${fmt(r.quantity_requested)} L</div></div>
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Source Depot</div><div class="tbld mt2">${r.source?.name||'—'}</div></div>
+      <div class="g3 mb4" style="gap:10px">
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Customer</div><div class="tbld mt1">${r.customer?.name||'—'}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Product & Qty</div><div class="tbld mt1">${r.product?.name||'—'} · ${fmt(r.quantity_requested||0)} L</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Source Depot</div><div class="tbld mt1">${r.source?.name||'—'}</div></div>
         <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Total Value</div><div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--brand);margin-top:4px">USD $${fmt(r.total_amount||0)}</div></div>
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Transporter</div><div class="tbld mt2">${r.transporter?.name||r.truck_registration||'—'}</div></div>
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Driver</div><div class="tbld mt2">${r.driver_name||'—'}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Truck / Trailer</div><div class="tbld mt1">${r.truck_registration||'—'}${r.trailer_registration?' / '+r.trailer_registration:''}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Driver</div><div class="tbld mt1">${r.driver_name||'—'} ${r.driver_id_no?'· ID: '+r.driver_id_no:''}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Signatory</div><div class="tbld mt1">${r.signatory||'—'}</div><div class="txs tmut">${r.signatory_title||''}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Transporter</div><div class="tbld mt1">${r.transporter?.name||'Own Collection'}</div></div>
       </div>
       <div class="flex gap2" style="flex-wrap:wrap">
-        <button class="btn btn-s" onclick="doApprove('${r.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Approve</button>
+        <button class="btn btn-s" onclick="doApprove('${r.id}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Approve
+        </button>
         <button class="btn btn-d" onclick="doReject('${r.id}')">Reject</button>
-        <button class="btn btn-o" onclick="viewRelease('${r.id}')">View Form</button>
+        <button class="btn btn-o" onclick="viewRelease('${r.id}')">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>View Form
+        </button>
+        <button class="btn btn-p" onclick="viewRelease('${r.id}');setTimeout(()=>printDoc('pf-rf'),800)">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>Print
+        </button>
       </div>
     </div>`).join('') :
-    `<div class="card" style="text-align:center;padding:40px"><div style="font-size:2rem">✅</div><div style="font-weight:700;color:var(--ink);margin-top:8px">All caught up!</div><div class="tmut tsm">No pending approvals.</div></div>`;
+    `<div class="card" style="text-align:center;padding:40px">
+      <div style="font-size:2.5rem;margin-bottom:10px">✅</div>
+      <div style="font-weight:700;color:var(--ink);margin-bottom:6px">All caught up!</div>
+      <div class="tmut tsm">No pending approvals.</div>
+    </div>`;
 }
 
 function renderInvoices() {
@@ -1354,20 +1388,176 @@ function renderAudit() {
 
 function renderNotifs() {
   const list = document.getElementById('notif-list');
-  const lows = DATA.stock.filter(s=>(s.current_balance||0)<=(s.reorder_level||0) && s.reorder_level>0);
-  const items = [
-    ...lows.map(s=>({type:'warning',title:'Low Stock Alert',msg:`${s.product?.name} at ${s.source?.name} — ${fmt(s.current_balance)} L remaining (reorder: ${fmt(s.reorder_level)} L)`,time:'Now'})),
-    ...DATA.invoices.filter(i=>i.status==='Overdue').map(i=>({type:'error',title:'Overdue Invoice',msg:`${i.invoice_no} — ${i.customer?.name||''} — $${fmt(i.balance_due||0)} overdue`,time:fmtDate(i.invoice_date)})),
-    ...DATA.releases.filter(r=>r.status==='Pending Approval').map(r=>({type:'info',title:'Pending Approval',msg:`${r.release_no} — ${r.customer?.name||''} — ${fmt(r.quantity_requested)} L`,time:fmtDate(r.release_date)})),
-  ];
-  const colors = {warning:'#fffbeb',error:'#fee2e2',info:'#e0f2fe',success:'#d1fae5'};
-  const borders = {warning:'#fde68a',error:'#fecaca',info:'#bae6fd',success:'#a7f3d0'};
-  const icons = {warning:'⚠️',error:'🚨',info:'ℹ️',success:'✅'};
-  if (list) list.innerHTML = items.length ? items.map(n=>`
-    <div style="background:${colors[n.type]};border:1px solid ${borders[n.type]};border-radius:12px;padding:14px 18px;display:flex;gap:12px;align-items:flex-start;margin-bottom:10px">
-      <span style="font-size:1.1rem;flex-shrink:0">${icons[n.type]}</span>
-      <div style="flex:1"><div style="font-weight:700;color:var(--ink);margin-bottom:3px">${n.title}</div><div class="tsm">${n.msg}</div><div class="txs tmut mt2">${n.time}</div></div>
-    </div>`).join('') : '<div class="empty">No notifications. All systems normal.</div>';
+  if (!list) return;
+
+  // Summary counts
+  const pendingApprovals = DATA.releases.filter(r=>r.status==='Pending Approval'||r.status==='Draft').length;
+  const sordOutstanding = DATA.releases.filter(r=>(r.status==='Approved'||r.status==='Partial')&&((r.quantity_requested||0)-(r.quantity_released||0))>0).length;
+  const overdueInv = DATA.invoices.filter(i=>i.status==='Overdue'||(i.due_date&&new Date(i.due_date)<new Date()&&(i.balance_due||0)>0)).length;
+  const pendingSupp = DATA.suppliers.filter(s=>s.status==='Pending'||s.status==='Partial').length;
+  const lowStock = DATA.stock.filter(s=>(s.current_balance||0)<=(s.reorder_level||0)&&s.reorder_level>0).length;
+
+  const sumEl = document.getElementById('notif-summary');
+  if (sumEl) sumEl.innerHTML = `
+    <div class="card card-sm" style="border-left:4px solid var(--amb);cursor:pointer" onclick="nav('approvals')">
+      <div class="txs tmut">Pending Approvals</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${pendingApprovals?'var(--amb)':'var(--em)'};margin-top:4px">${pendingApprovals}</div>
+      <div class="txs tmut mt1">Release orders awaiting approval</div>
+    </div>
+    <div class="card card-sm" style="border-left:4px solid #6d28d9;cursor:pointer" onclick="nav('drawdowns')">
+      <div class="txs tmut">SORD Balances Outstanding</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${sordOutstanding?'#6d28d9':'var(--em)'};margin-top:4px">${sordOutstanding}</div>
+      <div class="txs tmut mt1">Approved SORDs not fully drawn</div>
+    </div>
+    <div class="card card-sm" style="border-left:4px solid var(--rose);cursor:pointer" onclick="nav('invoices')">
+      <div class="txs tmut">Overdue Invoices</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${overdueInv?'var(--rose)':'var(--em)'};margin-top:4px">${overdueInv}</div>
+      <div class="txs tmut mt1">Invoices past due date</div>
+    </div>
+    <div class="card card-sm" style="border-left:4px solid var(--sky);cursor:pointer" onclick="nav('suppliers')">
+      <div class="txs tmut">Pending Purchases</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${pendingSupp?'var(--sky)':'var(--em)'};margin-top:4px">${pendingSupp}</div>
+      <div class="txs tmut mt1">Supplier orders not yet received</div>
+    </div>
+    <div class="card card-sm" style="border-left:4px solid var(--gold);cursor:pointer" onclick="nav('stock')">
+      <div class="txs tmut">Low Stock Alerts</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${lowStock?'var(--gold)':'var(--em)'};margin-top:4px">${lowStock}</div>
+      <div class="txs tmut mt1">Depots below reorder level</div>
+    </div>`;
+
+  const isManager = _currentProfile?.role?.name === 'Manager' ||
+                    _currentProfile?.role?.name === 'Super Admin' ||
+                    _currentProfile?.role?.permissions?.approve ||
+                    _currentProfile?.role?.permissions?.all;
+
+  const items = [];
+
+  // ── PENDING APPROVALS (for Manager / Super Admin only) ──
+  if (isManager) {
+    const pending = DATA.releases.filter(r => r.status === 'Pending Approval' || r.status === 'Draft');
+    pending.forEach(r => {
+      items.push({
+        type: 'approval',
+        title: 'Approval Required',
+        msg: `<strong>${r.release_no}</strong>${r.sord_number ? ' · SORD: '+r.sord_number : ''}<br>
+              Customer: ${r.customer?.name||'—'} · ${r.product?.name||'—'} · ${fmt(r.quantity_requested||0)} L<br>
+              Source: ${r.source?.name||'—'} · Created: ${fmtDate(r.release_date)}`,
+        time: fmtDate(r.release_date),
+        action: `<div class="flex gap2 mt2">
+          <button class="btn btn-s btn-sm" onclick="approveRelease('${r.id}')">✓ Approve</button>
+          <button class="btn btn-d btn-sm" onclick="rejectRelease('${r.id}')">✗ Reject</button>
+          <button class="btn btn-o btn-sm" onclick="viewRelease('${r.id}')">View</button>
+        </div>`
+      });
+    });
+  }
+
+  // ── LOW STOCK ALERTS (for all roles) ──
+  const lows = DATA.stock.filter(s => (s.current_balance||0) <= (s.reorder_level||0) && s.reorder_level > 0);
+  lows.forEach(s => {
+    items.push({
+      type: 'warning',
+      title: 'Low Stock Alert',
+      msg: `<strong>${s.product?.name||'—'}</strong> at ${s.source?.name||'—'}<br>
+            Current: ${fmt(s.current_balance||0)} L · Reorder level: ${fmt(s.reorder_level||0)} L`,
+      time: 'Now',
+      action: ''
+    });
+  });
+
+  // ── OVERDUE INVOICES (for all roles) ──
+  const overdue = DATA.invoices.filter(i => i.status === 'Overdue' || (i.due_date && new Date(i.due_date) < new Date() && i.balance_due > 0));
+  overdue.forEach(i => {
+    items.push({
+      type: 'error',
+      title: 'Overdue Invoice',
+      msg: `<strong>${i.invoice_no}</strong> · ${i.customer?.name||'—'}<br>
+            Balance due: $${fmt(i.balance_due||0)} · Due: ${fmtDate(i.due_date)}`,
+      time: fmtDate(i.due_date),
+      action: `<button class="btn btn-o btn-sm mt2" onclick="viewInvoice('${i.id}')">View Invoice</button>`
+    });
+  });
+
+  // ── SUPPLIER PURCHASES PENDING (for all roles) ──
+  DATA.suppliers.filter(s=>s.status==='Pending'||s.status==='Partial').forEach(s=>{
+    items.push({
+      type: 'info',
+      title: 'Supplier Purchase Pending',
+      msg: `<strong>${s.invoice_number||s.reference_no||'—'}</strong> · ${s.supplier_name||'—'}<br>
+            ${s.supply_type||'Local'} · ${fmt(s.quantity_ordered||0)} L ${s.product?.name||''}<br>
+            Release date: ${s.expected_date ? fmtDate(s.expected_date) : '—'}`,
+      time: fmtDate(s.invoice_date),
+      action: `<button class="btn btn-o btn-sm mt2" onclick="nav('suppliers')">View Purchases</button>`
+    });
+  });
+
+  // ── SORD BALANCES OUTSTANDING (approved releases not fully drawn) ──
+  DATA.releases.filter(r=>r.status==='Approved'||r.status==='Partial').forEach(r=>{
+    const bal = (r.quantity_requested||0)-(r.quantity_released||0);
+    if (bal <= 0) return;
+    items.push({
+      type: 'info',
+      title: 'SORD Balance Outstanding',
+      msg: `<strong>${r.release_no}</strong>${r.sord_number?' · SORD: '+r.sord_number:' · No SORD assigned'}<br>
+            ${r.customer?.name||'—'} · Remaining: <strong>${fmt(bal)} L</strong> ${r.product?.name||''}<br>
+            Released: ${fmt(r.quantity_released||0)} of ${fmt(r.quantity_requested||0)} L`,
+      time: fmtDate(r.release_date),
+      action: `<button class="btn btn-o btn-sm mt2" onclick="nav('drawdowns')">Record Collection</button>`
+    });
+  });
+
+  // Colour scheme per type
+  const cfg = {
+    approval: {bg:'#fef3c7',bd:'#fcd34d',dot:'#f59e0b',icon:`<svg viewBox="0 0 24 24" fill="#92400e" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`},
+    warning:  {bg:'#fffbeb',bd:'#fde68a',dot:'#f59e0b',icon:`<svg viewBox="0 0 24 24" fill="#92400e" width="18" height="18"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`},
+    error:    {bg:'#fee2e2',bd:'#fecaca',dot:'#ef4444',icon:`<svg viewBox="0 0 24 24" fill="#991b1b" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`},
+    info:     {bg:'#e0f2fe',bd:'#bae6fd',dot:'#0ea5e9',icon:`<svg viewBox="0 0 24 24" fill="#0369a1" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`}
+  };
+
+  list.innerHTML = items.length ? items.map(n => {
+    const c = cfg[n.type] || cfg.info;
+    return `<div style="background:${c.bg};border:1.5px solid ${c.bd};border-radius:13px;padding:16px 18px;display:flex;gap:13px;align-items:flex-start;margin-bottom:10px">
+      <div style="flex-shrink:0;margin-top:2px">${c.icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--ink);margin-bottom:5px;font-size:.85rem">${n.title}</div>
+        <div style="font-size:.78rem;color:var(--txt);line-height:1.55">${n.msg}</div>
+        ${n.action||''}
+        <div style="font-size:.68rem;color:var(--mut);margin-top:6px">${n.time}</div>
+      </div>
+    </div>`;
+  }).join('') : `<div style="text-align:center;padding:40px 20px">
+    <svg viewBox="0 0 24 24" fill="currentColor" style="width:40px;height:40px;color:var(--mut);opacity:.4;margin-bottom:10px"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+    <div class="tmut">No notifications. All systems normal.</div>
+  </div>`;
+
+  // Update badge in sidebar and topbar
+  updateNotifBadge(items.length);
+}
+
+function updateNotifBadge(count) {
+  const nd = document.getElementById('nd');
+  if (nd) nd.style.display = count > 0 ? 'block' : 'none';
+  const nb = document.querySelector('.ni[data-page="notifications"] .nbadge');
+  if (nb) { nb.textContent = count; nb.style.display = count > 0 ? 'inline-block' : 'none'; }
+  else if (count > 0) {
+    const ni = document.querySelector('.ni[data-page="notifications"]');
+    if (ni && !ni.querySelector('.nbadge')) {
+      const badge = document.createElement('span');
+      badge.className = 'nbadge';
+      badge.textContent = count;
+      ni.appendChild(badge);
+    }
+  }
+}
+
+function refreshNotifBadge() {
+  const count =
+    DATA.releases.filter(r=>r.status==='Pending Approval'||r.status==='Draft').length +
+    DATA.releases.filter(r=>(r.status==='Approved'||r.status==='Partial')&&((r.quantity_requested||0)-(r.quantity_released||0))>0).length +
+    DATA.invoices.filter(i=>i.status==='Overdue'||(i.due_date&&new Date(i.due_date)<new Date()&&(i.balance_due||0)>0)).length +
+    DATA.suppliers.filter(s=>s.status==='Pending'||s.status==='Partial').length +
+    DATA.stock.filter(s=>(s.current_balance||0)<=(s.reorder_level||0)&&s.reorder_level>0).length;
+  updateNotifBadge(count);
 }
 
 // ═══════════════════════════════════════════
@@ -1824,7 +2014,20 @@ async function openCRUD(type, id) {
     record = data || {};
     _crudRecord = record;
   }
-  const labels = {customer:'Customer',product:'Product',depot:'Depot/Source',station:'Service Station',transporter:'Transporter',province:'Province',sector:'Sector',user:'User',role:'Role',release:'Release Order',drawdown:'Drawdown',invoice:'Invoice',supplier:'Purchase Order'};
+
+  // For new release orders — auto-fill signatory with first Manager-role user
+  if (type === 'release' && !id) {
+    const manager = DATA.users.find(u =>
+      u.role?.name === 'Manager' || u.role?.name === 'Super Admin' ||
+      u.role?.permissions?.approve || u.role?.permissions?.all
+    );
+    if (manager) {
+      record.signatory = record.signatory || manager.full_name;
+      record.signatory_title = record.signatory_title || manager.department || manager.role?.name || '';
+    }
+  }
+
+  const labels = {customer:'Customer',product:'Product',depot:'Depot/Source',station:'Service Station',transporter:'Transporter',truck:'Truck',province:'Province',sector:'Sector',user:'User',role:'Role',release:'Release Order',drawdown:'Drawdown / Collection',invoice:'Invoice',supplier:'Supplier Purchase'};
   document.getElementById('crud-title').textContent = (id?'Edit ':'New ') + (labels[type]||type);
   document.getElementById('crud-body').innerHTML = (FORMS[type]||((d)=>'<div class="empty">Form not defined</div>'))(record);
   openModal('m-crud');
@@ -2017,14 +2220,28 @@ async function saveCRUD() {
 
     // After new release order — notify authoriser + offer creator print options
     if (type === 'release' && !_crudRecord?.id && savedData) {
-      await notifyAuthorisers(savedData, payload);
+      await notifyAuthorisers(savedData, payload, 'release');
       setTimeout(() => showCreatorOptions('release', savedData, payload), 600);
     }
 
-    // After new invoice — offer print options
+    // After new invoice — notify + offer print options
     if (type === 'invoice' && !_crudRecord?.id && savedData) {
+      await notifyAuthorisers(savedData, payload, 'invoice');
       setTimeout(() => showCreatorOptions('invoice', savedData, payload), 600);
     }
+
+    // After new supplier purchase — notify
+    if (type === 'supplier' && !_crudRecord?.id) {
+      await notifyAuthorisers(savedData, payload, 'supplier');
+    }
+
+    // After new drawdown — notify
+    if (type === 'drawdown' && !_crudRecord?.id) {
+      await notifyAuthorisers(savedData, payload, 'drawdown');
+    }
+
+    // Always refresh badge after any save
+    refreshNotifBadge();
 
   } catch(e) { toast('Save failed: '+e.message,'error'); }
   hideSpinner();
@@ -2033,64 +2250,52 @@ async function saveCRUD() {
 // ═══════════════════════════════════════════
 // NOTIFY AUTHORISERS after release creation
 // ═══════════════════════════════════════════
-async function notifyAuthorisers(savedRelease, payload) {
+async function notifyAuthorisers(savedRecord, payload, docType) {
   try {
-    // Get all users with approval permission (Manager / Super Admin roles)
-    const authorisers = DATA.users.filter(u => {
-      const perms = u.role?.permissions || {};
-      return perms.all || perms.approve;
+    let action, entityType, ref, msg;
+
+    if (docType === 'release') {
+      const custName = DATA.customers.find(c=>c.id===payload.customer_id)?.name || '—';
+      const prodName = DATA.products.find(p=>p.id===payload.product_id)?.name || '—';
+      ref = payload.release_no || '';
+      action = 'APPROVAL_REQUIRED';
+      entityType = 'release_orders';
+      msg = `Release ${ref} — ${custName} — ${(payload.quantity_requested||0).toLocaleString()} L ${prodName}`;
+    } else if (docType === 'invoice') {
+      const custName = DATA.customers.find(c=>c.id===payload.customer_id)?.name || '—';
+      ref = payload.invoice_no || '';
+      action = 'INVOICE_CREATED';
+      entityType = 'invoices';
+      msg = `Invoice ${ref} — ${custName} — $${(payload.total_amount||0).toLocaleString()}`;
+    } else if (docType === 'supplier') {
+      ref = payload.invoice_number || payload.reference_no || '';
+      action = 'PURCHASE_CREATED';
+      entityType = 'supplier_purchases';
+      msg = `Supplier Purchase ${ref} — ${payload.supplier_name||'—'} — ${(payload.quantity_ordered||0).toLocaleString()} L`;
+    } else if (docType === 'drawdown') {
+      ref = payload.collection_ref || 'DD-'+Date.now();
+      action = 'DRAWDOWN_RECORDED';
+      entityType = 'release_drawdowns';
+      msg = `Collection recorded — ${(payload.quantity||0).toLocaleString()} L drawn`;
+    }
+
+    // Store in audit_logs (serves as in-app notification store)
+    await sb.from('audit_logs').insert({
+      action,
+      entity_type: entityType,
+      entity_ref: ref,
+      user_name: _currentProfile?.full_name || _currentUser?.email || 'System',
+      new_values: JSON.stringify({ message: msg, sord: payload.sord_number||null })
     });
 
-    if (!authorisers.length) {
-      toast('Release saved — no authoriser accounts found to notify', 'warning');
-      return;
-    }
+    // Refresh badge immediately
+    refreshNotifBadge();
 
-    // Get customer and product names for the notification
-    const custName = DATA.customers.find(c=>c.id===payload.customer_id)?.name || '—';
-    const prodName = DATA.products.find(p=>p.id===payload.product_id)?.name || '—';
-    const qty = (payload.quantity_requested||0).toLocaleString();
-    const relNo = payload.release_no || '';
-    const sord = payload.sord_number ? ` · SORD: ${payload.sord_number}` : '';
+    const docLabels = {release:'Release Order', invoice:'Invoice', supplier:'Purchase Order', drawdown:'Collection'};
+    toast(`${docLabels[docType]||'Document'} saved — Managers notified via Notifications tab`, 'success');
 
-    // Store in-app notification for each authoriser via audit_logs table
-    for (const auth of authorisers) {
-      await sb.from('audit_logs').insert({
-        action: 'APPROVAL_REQUIRED',
-        entity_type: 'release_orders',
-        entity_ref: relNo,
-        user_name: 'System',
-        new_values: JSON.stringify({
-          message: `Release ${relNo}${sord} for ${custName} — ${qty} L ${prodName} requires your approval.`,
-          release_id: savedRelease?.id,
-          release_no: relNo,
-          notify_user_id: auth.id,
-          created_by: _currentProfile?.full_name || _currentUser?.email
-        })
-      });
-    }
-
-    // Build mailto: for each authoriser's email
-    const emails = authorisers.map(u=>u.email).filter(Boolean);
-    if (emails.length) {
-      const subject = `[FlowTrack] Approval Required – ${relNo}`;
-      const body = `Dear Authoriser,\n\nA new Fuel Release Order has been created and requires your approval.\n\nRelease No: ${relNo}${sord}\nCustomer: ${custName}\nProduct: ${prodName}\nQuantity: ${qty} Litres\nDepot: ${DATA.sources.find(s=>s.id===payload.source_id)?.name||'—'}\nCreated By: ${_currentProfile?.full_name||_currentUser?.email||'System'}\n\nPlease log in to FlowTrack to review and approve or reject this release.\n\nhttps://flowtrak.netlify.app\n\nFlowTrack Petroleum Intelligence`;
-      const mailto = `mailto:${emails.join(';')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      // Show notification option
-      const doEmail = confirm(`Release ${relNo} saved!\n\nSend email notification to ${authorisers.length} authoriser(s)?\n(${emails.join(', ')})`);
-      if (doEmail) {
-        window.location.href = mailto;
-        toast(`Notification email opened for ${authorisers.length} authoriser(s)`, 'success');
-      } else {
-        toast(`Release saved. Authorisers can see it in the Approvals tab.`, 'info');
-      }
-    } else {
-      toast('Release saved. No authoriser email addresses found — notify them manually.', 'warning');
-    }
   } catch(e) {
     console.warn('Notification error:', e.message);
-    toast('Release saved. Could not send notification: '+e.message, 'warning');
   }
 }
 
@@ -2901,6 +3106,12 @@ async function onSignedIn() {
 
   renderDashboard();
   calcBlend();
+
+  // Show notification badge immediately after login
+  const pendingApprovals = DATA.releases.filter(r => r.status === 'Pending Approval' || r.status === 'Draft').length;
+  const lowStock = DATA.stock.filter(s => (s.current_balance||0) <= (s.reorder_level||0) && s.reorder_level > 0).length;
+  updateNotifBadge(pendingApprovals + lowStock);
+
   toast('Welcome back, ' + name.split(' ')[0] + '!', 'success');
 }
 
