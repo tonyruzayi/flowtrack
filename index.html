@@ -2882,105 +2882,6 @@ function buildReleaseForm(r, bal) {
     </div>
   </div>`;
 }
-    <!-- Header: Customer letterhead -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px 14px;border-bottom:2px solid #0a0f1e">
-      <div>
-        <div style="font-size:18px;font-weight:800;color:#0a0f1e;letter-spacing:-.3px">${r.customer?.name||'— Customer —'}</div>
-        <div style="font-size:9px;color:#6b7280;margin-top:2px">${r.customer?.address||''}</div>
-        <div style="font-size:9px;color:#6b7280">${r.customer?.phone||''}</div>
-      </div>
-      <div style="text-align:right;font-size:10px;color:#374151">
-        <div>${fmtDate(r.release_date)}</div>
-        <div style="font-size:9px;color:#9ca3af;margin-top:3px">Ref: ${r.release_no}</div>
-      </div>
-    </div>
-
-    <!-- Addressee -->
-    <div style="padding:14px 24px 8px;font-size:11px;line-height:1.7">
-      <div>The Depot Manager</div>
-      <div style="font-weight:700">National Oil Infrastructure Company of Zimbabwe</div>
-      <div>${r.source?.name||'Msasa'}</div>
-    </div>
-    <div style="padding:0 24px 10px;font-size:11px">Dear Sir/Madam</div>
-
-    <!-- Uplift block -->
-    <div style="margin:0 24px;border:1.5px solid #0a0f1e;border-radius:6px;overflow:hidden">
-      <div style="background:#0a0f1e;color:#fff;padding:8px 14px;display:flex;align-items:baseline;gap:16px">
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.7">Uplift Number</span>
-        <span style="font-size:18px;font-weight:800;letter-spacing:-.3px">${r.release_no}</span>
-      </div>
-      <div style="padding:10px 14px;font-size:11px">
-        Please allow <strong>${r.customer?.name||'—'}</strong> to uplift the products as detailed below.
-      </div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <tr style="border-top:1px solid #e5e7eb">
-          <td style="padding:8px 14px;color:#374151;width:45%">Product</td>
-          <td style="padding:8px 14px;font-weight:700">${r.product?.name||'—'}</td>
-        </tr>
-        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb">
-          <td style="padding:8px 14px;color:#374151">Quantity</td>
-          <td style="padding:8px 14px;font-weight:800;font-size:13px">${fmt(r.quantity_requested||0)} Litres</td>
-        </tr>
-        <tr style="border-top:1px solid #e5e7eb">
-          <td style="padding:8px 14px;color:#374151">NOIC Sales Order No.</td>
-          <td style="padding:8px 14px;font-weight:700;color:#e85d26">${r.sord_number||'— Pending SORD —'}</td>
-        </tr>
-        ${bal > 0 ? `<tr style="background:#fff7ed;border-top:1px solid #fed7aa">
-          <td style="padding:8px 14px;color:#92400e">Balance Remaining</td>
-          <td style="padding:8px 14px;font-weight:700;color:#e85d26">${fmt(bal)} Litres</td>
-        </tr>` : ''}
-      </table>
-    </div>
-
-    <!-- Transporter & Driver -->
-    <div style="margin:14px 24px 0;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
-      <div style="background:#f4f5f8;padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151">Transporter and Truck Driver Details</div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <tr><td style="padding:7px 14px;color:#374151;width:40%">Transporter</td><td style="padding:7px 14px;font-weight:700">${r.transporter?.name||'Own Collection'}</td></tr>
-        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Driver's Name</td><td style="padding:7px 14px;font-weight:700">${r.driver_name||'—'}</td></tr>
-        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">ID Number</td><td style="padding:7px 14px;font-weight:700">${r.driver_id_no||'—'}</td></tr>
-        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Vehicle Registration</td><td style="padding:7px 14px;font-weight:700">${r.truck_registration||'—'}</td></tr>
-        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Trailer Registration</td><td style="padding:7px 14px;font-weight:700">${r.trailer_registration||'—'}</td></tr>
-      </table>
-    </div>
-
-    <!-- Signatory -->
-    <div style="padding:14px 24px">
-      <div style="font-size:11px;color:#374151;margin-bottom:14px">For and on behalf of <strong>${r.customer?.name||'—'}</strong></div>
-      ${(()=>{
-        // Build array of active authorisers
-        const auths = [
-          { name: r.signatory, img: _signatures[r.signatory] },
-          r.signatory2 ? { name: r.signatory2, img: _signatures[r.signatory2] } : null,
-          r.signatory3 ? { name: r.signatory3, img: _signatures[r.signatory3] } : null,
-        ].filter(Boolean);
-        const cols = auths.length + 1; // +1 for NOIC
-        const colStyle = `display:grid;grid-template-columns:${Array(cols).fill('1fr').join(' ')};gap:24px`;
-        return `<div style="${colStyle}">
-          ${auths.map(a=>`
-            <div>
-              <div style="height:50px;border-bottom:1.5px solid #374151;margin-bottom:6px;display:flex;align-items:flex-end;padding-bottom:4px">
-                ${a.img ? `<img src="${a.img}" style="max-height:44px;max-width:120px;object-fit:contain"/>` :
-                `<span style="font-size:9px;color:#d1d5db;font-style:italic">No e-signature on file</span>`}
-              </div>
-              <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">Authorised Signatory</div>
-              <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">${a.name}</div>
-            </div>`).join('')}
-          <div>
-            <div style="height:50px;border-bottom:1.5px solid #374151;margin-bottom:6px"></div>
-            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">NOIC Depot Official — Signature &amp; Stamp</div>
-          </div>
-        </div>`;
-      })()}
-    </div>
-
-    <!-- Footer -->
-    <div style="background:#f4f5f8;padding:8px 24px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb">
-      <span>${r.customer?.phone||''} &nbsp;·&nbsp; ${r.customer?.address||''}</span>
-      <span>Generated by FlowTrack · ${new Date().toLocaleDateString('en-GB')}</span>
-    </div>
-  </div>`;
-}
 
 function buildInvoice(inv) {
   const dueD = inv.due_date || (()=>{ const d=new Date(inv.invoice_date||Date.now()); d.setDate(d.getDate()+14); return d.toISOString().split('T')[0]; })();
@@ -3090,6 +2991,58 @@ function sendEmail() {
 // ═══════════════════════════════════════════
 // EXPORT CSV
 // ═══════════════════════════════════════════
+function exportCSVGetRows(type) {
+  const products = [...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
+  const all = {
+    sector_province: (()=>{
+      const sectors = [...new Set(DATA.customers.map(c=>c.sector?.name||'Unknown'))].sort();
+      const rows = [['Dimension','Group',...products,'TOTAL (L)']];
+      let grandTot = 0;
+      const grandProds = products.map(()=>0);
+      sectors.forEach(sec => {
+        const secIds = DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec).map(c=>c.id);
+        const secRels = DATA.releases.filter(r=>secIds.includes(r.customer_id));
+        const secRow = ['SECTOR', sec];
+        let secTot = 0;
+        products.forEach((p,pi) => {
+          const v = secRels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);
+          secRow.push(v); secTot+=v; grandProds[pi]+=v;
+        });
+        secRow.push(secTot); grandTot+=secTot;
+        rows.push(secRow);
+        const provinces = [...new Set(DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec).map(c=>c.province?.name||'Unknown'))].sort();
+        provinces.forEach(prov => {
+          const provIds = DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec&&(c.province?.name||'Unknown')===prov).map(c=>c.id);
+          const provRels = DATA.releases.filter(r=>provIds.includes(r.customer_id));
+          const provRow = ['  Province', prov];
+          let provTot = 0;
+          products.forEach(p => {
+            const v = provRels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);
+            provRow.push(v); provTot+=v;
+          });
+          provRow.push(provTot);
+          rows.push(provRow);
+        });
+      });
+      rows.push(['GRAND TOTAL','ALL',...grandProds,grandTot]);
+      return rows;
+    })(),
+    local_import: (()=>{
+      const local = DATA.suppliers.filter(s=>s.supply_type!=='Import');
+      const imports = DATA.suppliers.filter(s=>s.supply_type==='Import');
+      const rows = [['Supply Type','Supplier','Product','Ordered (L)','Drawn (L)','Balance (L)','Duty (USD)','Total (USD)','Status']];
+      [...local,...imports].forEach(s=>{
+        rows.push([s.supply_type||'Local',s.supplier_name||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.duty_amount||0,s.total_amount||0,s.status||'']);
+      });
+      rows.push([]);
+      rows.push(['─ Local Total','','',local.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+local.reduce((s,x)=>s+(x.duty_amount||0),0),'$'+local.reduce((s,x)=>s+(x.total_amount||0),0),'']);
+      rows.push(['─ Import Total','','',imports.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+imports.reduce((s,x)=>s+(x.duty_amount||0),0),'$'+imports.reduce((s,x)=>s+(x.total_amount||0),0),'']);
+      return rows;
+    })()
+  };
+  return all[type] || [];
+}
+
 function exportCSV(type) {
   const csvData = {
     stock: [['Source','Product','Balance (L)','Reserved','Available','Reorder','Status'],...DATA.stock.map(s=>[(s.source?.name||''),(s.product?.name||''),s.current_balance||0,s.reserved_quantity||0,(s.current_balance||0)-(s.reserved_quantity||0),s.reorder_level||0,(s.current_balance||0)<=(s.reorder_level||0)?'LOW STOCK':'OK'])],
