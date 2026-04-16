@@ -607,9 +607,16 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 
 <!-- USERS -->
 <section class="page" id="page-users">
-  <div class="sh"><div class="st">Users & RBAC</div><button class="btn btn-b btn-sm" onclick="openCRUD('user',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Add User</button></div>
+  <div class="sh">
+    <div class="st">Users & RBAC</div>
+    <div class="flex gap2">
+      <button class="btn btn-o btn-sm" onclick="openSignaturePad(_currentProfile?.full_name)">✍ My Signature</button>
+      <button class="btn btn-b btn-sm" onclick="openCRUD('user',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Add User</button>
+    </div>
+  </div>
+  <div class="al al-i mb3" style="font-size:.78rem">Managers & Signatories: click <strong>My Signature</strong> to draw and save your e-signature. It will automatically appear on release forms you authorise.</div>
   <div class="g65">
-    <div class="card"><div class="st mb4">System Users</div><div class="tw"><table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Dept</th><th>Status</th><th>Actions</th></tr></thead><tbody id="users-tbl"><tr><td colspan="6" class="empty">No users yet.</td></tr></tbody></table></div></div>
+    <div class="card"><div class="st mb4">System Users</div><div class="tw"><table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Dept</th><th>Signature</th><th>Status</th><th>Actions</th></tr></thead><tbody id="users-tbl"><tr><td colspan="7" class="empty">No users yet.</td></tr></tbody></table></div></div>
     <div class="card"><div class="st mb4">Roles & Permissions</div><div style="display:flex;flex-direction:column;gap:9px" id="roles-list"></div></div>
   </div>
 </section>
@@ -650,6 +657,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
   <div class="md wide">
     <div class="mh"><span class="mt">Release / Collection Form</span>
       <div class="flex gap2">
+        <button class="btn btn-o btn-sm" onclick="addSignatureToRelease()">✍ Sign</button>
         <button class="btn btn-o btn-sm" onclick="printDoc('pf-rf')">Print</button>
         <button class="btn btn-p btn-sm" onclick="dlPDF('pf-rf','release')">Download PDF</button>
         <button class="btn btn-s btn-sm" onclick="openEmailModal('release')">Send Email</button>
@@ -707,6 +715,27 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
       </div>
     </div>
     <div class="mf"><button class="btn btn-o" onclick="closeModal('m-email')">Cancel</button><button class="btn btn-s" onclick="sendEmail()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Send</button></div>
+  </div>
+</div>
+
+<!-- Signature Pad Modal -->
+<div class="mo" id="m-sigpad">
+  <div class="md" style="max-width:520px">
+    <div class="mh">
+      <span class="mt">Electronic Signature — <span id="sigpad-name">Signatory</span></span>
+      <button class="mc" onclick="closeModal('m-sigpad')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="mb">
+      <input type="hidden" id="sigpad-for"/>
+      <div class="al al-i mb3">Draw your signature below. It will appear on all release documents you authorise.</div>
+      <canvas id="sigpad-canvas" width="460" height="160" style="border:2px solid var(--bdr);border-radius:9px;cursor:crosshair;width:100%;background:#fff;touch-action:none;display:block"></canvas>
+      <div class="flex gap2 mt3">
+        <button class="btn btn-o" onclick="clearSigPad()">Clear</button>
+        <button class="btn btn-b" onclick="saveSigPad()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Save Signature
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1321,10 +1350,8 @@ function renderReports() {
     {label:'Release Orders',color:'#0ea5e9',fn:'releases',desc:'All orders with SORD numbers, truck, signatory, balances'},
     {label:'Invoice Aging',color:'#10b981',fn:'invoices',desc:'Receivables aging: current, 15–30, 31–60, 60+ days'},
     {label:'Supplier Performance',color:'#f59e0b',fn:'suppliers',desc:'Allocated, drawn, balance remaining per supplier'},
-    {label:'Blending Summary',color:'#7c3aed',fn:'blends',desc:'Blend batches, ratios, costs and output volumes'},
     {label:'Station Stock',color:'#ec4899',fn:'stations',desc:'Tank levels per company-owned site'},
-    {label:'Volume by Sector & Product',color:'#0f766e',fn:'sector_product',desc:'Total volumes released per sector broken down by product'},
-    {label:'Volume by Province & Product',color:'#1d4ed8',fn:'province_product',desc:'Total volumes released per province broken down by product'},
+    {label:'Volume by Sector & Province',color:'#0f766e',fn:'sector_province',desc:'Volumes released per sector and province, broken down by product'},
     {label:'Local vs Import Purchases',color:'#92400e',fn:'local_import',desc:'Local domestic supplier purchases vs external/foreign imports'},
   ];
   if (grid) grid.innerHTML = rpts.map(r=>`
@@ -1346,6 +1373,13 @@ function renderReports() {
     </div>`).join('');
 }
 
+function addSignatureToRelease() {
+  // Get current signatory from the displayed release form
+  const nameEl = document.querySelector('#pf-rf strong, #pf-rf [style*="font-weight:800"]');
+  const signatory = _currentProfile?.full_name || '';
+  openSignaturePad(signatory);
+}
+
 function renderUsers() {
   const tbl = document.getElementById('users-tbl');
   if (tbl) tbl.innerHTML = DATA.users.length ? DATA.users.map(u=>{
@@ -1355,13 +1389,18 @@ function renderUsers() {
       <td class="tmut">${u.email||'—'}</td>
       <td><span class="badge bb">${u.role?.name||'—'}</span></td>
       <td>${u.department||'—'}</td>
+      <td>${_signatures[u.full_name]
+        ? `<img src="${_signatures[u.full_name]}" style="height:28px;max-width:80px;object-fit:contain;border:1px solid var(--bdr);border-radius:4px"/>`
+        : `<button class="btn btn-o btn-sm" onclick="openSignaturePad('${u.full_name}')">✍ Add</button>`}
+      </td>
       <td><span class="badge ${u.is_active?'bg':'bgr'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="flex gap2">
         <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('user','${u.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+        ${u.full_name?`<button class="btn btn-o btn-sm btn-icon" onclick="openSignaturePad('${u.full_name}')" title="Manage Signature">✍</button>`:''}
         <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('user_profiles','${u.id}','${u.full_name}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       </div></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">No users yet.</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty">No users yet.</td></tr>';
 
   const rl = document.getElementById('roles-list');
   if (rl) rl.innerHTML = DATA.roles.map(r=>`
@@ -1700,6 +1739,52 @@ function tableFor(type) {
   return m[type] || type;
 }
 
+function onDriverSelect(driverName) {
+  if (!driverName) return;
+  // Find all trucks for this driver
+  const driverTrucks = DATA.trucks.filter(t => t.default_driver === driverName);
+  // Auto-fill driver ID
+  const idEl = document.getElementById('f-driverid');
+  if (idEl && driverTrucks.length) idEl.value = driverTrucks[0].driver_id_no || '';
+  // Auto-fill truck dropdown — if driver has multiple trucks show all, else auto-select
+  const truckSel = document.getElementById('f-truck');
+  if (!truckSel) return;
+  truckSel.innerHTML = '<option value="">— Select truck —</option>' +
+    driverTrucks.map(t => `<option value="${t.registration_no}">${t.registration_no}${t.max_capacity_litres?' ('+fmt(t.max_capacity_litres)+'L)':''}</option>`).join('');
+  if (driverTrucks.length === 1) {
+    truckSel.value = driverTrucks[0].registration_no;
+    // Auto-fill trailer if set
+    const trailerEl = document.getElementById('f-trailer');
+    if (trailerEl && driverTrucks[0].trailer_reg) trailerEl.value = driverTrucks[0].trailer_reg;
+    // Auto-fill transporter
+    const transSel = document.getElementById('f-trans');
+    if (transSel && driverTrucks[0].transporter_id) transSel.value = driverTrucks[0].transporter_id;
+  }
+}
+
+function prefillInvoiceFromRelease(releaseId) {
+  if (!releaseId) return;
+  const r = DATA.releases.find(x => x.id === releaseId);
+  if (!r) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
+  set('f-cust', r.customer_id);
+  set('f-prod', r.product_id);
+  set('f-qty', r.quantity_requested || '');
+  set('f-price', r.unit_price || '');
+  toast('Customer, product, quantity and price filled from ' + r.release_no, 'success');
+}
+
+function prefillDrawdownFromSupplier(supplierId) {
+  if (!supplierId) return;
+  const s = DATA.suppliers.find(x => x.id === supplierId);
+  if (!s) return;
+  const remaining = (s.quantity_ordered || 0) - (s.quantity_drawn || 0);
+  const qtyEl = document.getElementById('f-qty');
+  if (qtyEl && !qtyEl.value) { qtyEl.value = remaining; qtyEl.placeholder = 'Max: ' + fmt(remaining) + ' L'; }
+  const dutiesEl = document.getElementById('f-duties-qty');
+  if (dutiesEl && !dutiesEl.value) dutiesEl.value = remaining;
+}
+
 function filterTrucksByTransporter(transporterId) {
   const sel = document.getElementById('f-truck');
   if (!sel) return;
@@ -1707,16 +1792,14 @@ function filterTrucksByTransporter(transporterId) {
     ? DATA.trucks.filter(t => t.transporter_id === transporterId && t.is_active !== false)
     : DATA.trucks.filter(t => t.is_active !== false);
   sel.innerHTML = `<option value="">— Select truck —</option>` +
-    trucks.map(t => `<option value="${t.registration_no}">${t.registration_no}${t.make_model ? ' ('+t.make_model+')' : ''}${t.max_capacity_litres ? ' — '+fmt(t.max_capacity_litres)+'L' : ''}</option>`).join('');
-  sel.onchange = function() {
-    const truck = DATA.trucks.find(t => t.registration_no === this.value);
-    if (truck?.default_driver) {
-      const d = document.getElementById('f-driver');
-      const di = document.getElementById('f-driverid');
-      if (d && !d.value) d.value = truck.default_driver;
-      if (di && !di.value) di.value = truck.driver_id_no || '';
-    }
-  };
+    trucks.map(t => `<option value="${t.registration_no}">${t.registration_no}${t.max_capacity_litres?' ('+fmt(t.max_capacity_litres)+'L)':''}</option>`).join('');
+  // Also update driver dropdown to only show drivers from this transporter's trucks
+  const driverSel = document.getElementById('f-driver-sel');
+  if (driverSel) {
+    const uniqueDrivers = trucks.filter((t,i,a) => t.default_driver && a.findIndex(x=>x.default_driver===t.default_driver)===i);
+    driverSel.innerHTML = '<option value="">— Select Driver —</option>' +
+      uniqueDrivers.map(t => `<option value="${t.default_driver}">${t.default_driver}${t.driver_id_no?' (ID: '+t.driver_id_no+')':''}</option>`).join('');
+  }
 }
 
 function filterTrucksDrawdown(transporterId) {
@@ -1941,35 +2024,65 @@ const FORMS = {
   </div>`,
 
   release: (d={})=>`<div class="fgrid">
-    <div class="fg"><label>Release No. (Internal)</label><input class="inp" id="f-relno" value="${d.release_no||autoRelNo()}"/></div>
-    <div class="fg"><label>SORD No. (NOIC Issued)</label><input class="inp" id="f-sord" value="${d.sord_number||''}" placeholder="NOIC SORD reference"/></div>
+    <div class="fg"><label>Uplift / Release No. (Internal)</label><input class="inp" id="f-relno" value="${d.release_no||autoRelNo()}"/></div>
+    <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord" value="${d.sord_number||''}" placeholder="e.g. S-ORD22-065203"/></div>
     <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.release_date||today()}"/></div>
     <div class="fg"><label>Customer *</label><select class="sel" id="f-cust"><option value="">— Select —</option>${DATA.customers.map(c=>`<option value="${c.id}" ${d.customer_id===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Source Depot *</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Product *</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Quantity (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity_requested||''}"/></div>
     <div class="fg"><label>Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001"/></div>
+    <div class="fg full" style="border-top:1px solid var(--bdr);padding-top:14px;margin-top:4px">
+      <div class="txs tmut" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Transporter & Driver Details</div>
+    </div>
     <div class="fg"><label>Transporter</label><select class="sel" id="f-trans" onchange="filterTrucksByTransporter(this.value)"><option value="">— Own Collection —</option>${DATA.transporters.map(t=>`<option value="${t.id}" ${d.transporter_id===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
-    <div class="fg"><label>Truck Reg. No.</label><select class="sel" id="f-truck"><option value="">— Select truck —</option>${DATA.trucks.map(t=>`<option value="${t.registration_no}" ${d.truck_registration===t.registration_no?'selected':''}>${t.registration_no}${t.max_capacity_litres?' ('+fmt(t.max_capacity_litres)+'L)':''}</option>`).join('')}</select></div>
-    <div class="fg"><label>Trailer Reg. No.</label><input class="inp" id="f-trailer" value="${d.trailer_registration||''}" placeholder="Trailer number (if any)"/></div>
-    <div class="fg"><label>Driver Name</label><input class="inp" id="f-driver" value="${d.driver_name||''}"/></div>
-    <div class="fg"><label>Driver ID No.</label><input class="inp" id="f-driverid" value="${d.driver_id_no||''}"/></div>
-    <div class="fg"><label>Signatory (Authorising Person) *</label><input class="inp" id="f-signatory" value="${d.signatory||''}" placeholder="Full name of person authorising collection at NOIC"/></div>
-    <div class="fg"><label>Signatory Designation</label><input class="inp" id="f-sig-title" value="${d.signatory_title||''}" placeholder="e.g. Operations Manager"/></div>
+    <div class="fg"><label>Driver *</label><select class="sel" id="f-driver-sel" onchange="onDriverSelect(this.value)"><option value="">— Select Driver —</option>${DATA.trucks.filter((t,i,a)=>t.default_driver&&a.findIndex(x=>x.default_driver===t.default_driver)===i).map(t=>`<option value="${t.default_driver}" data-id="${t.driver_id_no||''}" ${d.driver_name===t.default_driver?'selected':''}>${t.default_driver}${t.driver_id_no?' (ID: '+t.driver_id_no+')':''}</option>`).join('')}</select></div>
+    <div class="fg"><label>Driver ID No.</label><input class="inp" id="f-driverid" value="${d.driver_id_no||''}" placeholder="Auto-filled from driver selection"/></div>
+    <div class="fg"><label>Vehicle Registration *</label><select class="sel" id="f-truck"><option value="">— Select truck —</option>${DATA.trucks.map(t=>`<option value="${t.registration_no}" ${d.truck_registration===t.registration_no?'selected':''}>${t.registration_no}${t.max_capacity_litres?' ('+fmt(t.max_capacity_litres)+'L)':''}</option>`).join('')}</select></div>
+    <div class="fg"><label>Trailer Registration</label><input class="inp" id="f-trailer" value="${d.trailer_registration||''}" placeholder="e.g. AEZ 9668"/></div>
+    <div class="fg full" style="border-top:1px solid var(--bdr);padding-top:14px;margin-top:4px">
+      <div class="txs tmut" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Authorisation</div>
+      <div class="txs tmut mb3" style="font-size:.72rem">Select up to 3 authorisers. Use only as many as your company requires. At least one is required.</div>
+    </div>
+    <div class="fg">
+      <label>Authoriser 1 *</label>
+      <select class="sel" id="f-signatory" onchange="document.getElementById('f-signatory-custom').style.display=this.value==='__custom__'?'block':'none'">
+        <option value="">— Select Authoriser —</option>
+        ${DATA.users.map(u=>`<option value="${u.full_name||''}" ${d.signatory===u.full_name?'selected':''}>${u.full_name||'—'} (${u.role?.name||'—'})</option>`).join('')}
+        <option value="__custom__" ${d.signatory&&!DATA.users.find(u=>u.full_name===d.signatory)?'selected':''}>Other (type name)…</option>
+      </select>
+      <input class="inp mt2" id="f-signatory-custom" placeholder="Enter name if not in list" value="${d.signatory&&!DATA.users.find(u=>u.full_name===d.signatory)?d.signatory:''}" style="display:${d.signatory&&!DATA.users.find(u=>u.full_name===d.signatory)?'block':'none'}"/>
+    </div>
+    <div class="fg">
+      <label>Authoriser 2 <span class="txs tmut">(optional)</span></label>
+      <select class="sel" id="f-signatory2">
+        <option value="">— Not required —</option>
+        ${DATA.users.map(u=>`<option value="${u.full_name||''}" ${d.signatory2===u.full_name?'selected':''}>${u.full_name||'—'} (${u.role?.name||'—'})</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg">
+      <label>Authoriser 3 <span class="txs tmut">(optional)</span></label>
+      <select class="sel" id="f-signatory3">
+        <option value="">— Not required —</option>
+        ${DATA.users.map(u=>`<option value="${u.full_name||''}" ${d.signatory3===u.full_name?'selected':''}>${u.full_name||'—'} (${u.role?.name||'—'})</option>`).join('')}
+      </select>
+    </div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Draft'?'selected':''}>Draft</option><option ${d.status==='Pending Approval'?'selected':''}>Pending Approval</option><option ${d.status==='Approved'?'selected':''}>Approved</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Completed'?'selected':''}>Completed</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
-    <div class="fg full"><label>Notes / Special Instructions</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
+    <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
 
   drawdown: (d={})=>`<div class="fgrid">
-    <div class="fg full"><label>Release Order *</label><select class="sel" id="f-rel" onchange="prefillDrawdownFromRelease(this.value)"><option value="">— Select Approved Release —</option>${DATA.releases.filter(r=>r.status==='Approved'||r.status==='Partial').map(r=>`<option value="${r.id}" ${d.release_order_id===r.id?'selected':''}>${r.release_no} – ${r.customer?.name||''} – ${fmt((r.quantity_requested||0)-(r.quantity_released||0))} L remaining</option>`).join('')}</select></div>
+    <div class="fg full"><label>Supplier Release / Purchase *</label>
+      <select class="sel" id="f-sup-rel" onchange="prefillDrawdownFromSupplier(this.value)">
+        <option value="">— Select Supplier Release —</option>
+        ${DATA.suppliers.filter(s=>s.status==='Pending'||s.status==='Partial').map(s=>`<option value="${s.id}" ${d.supplier_purchase_id===s.id?'selected':''}>${s.invoice_number||s.reference_no} — ${s.supplier_name||'—'} — ${fmt((s.quantity_ordered||0)-(s.quantity_drawn||0))} L remaining</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord-dd" value="${d.sord_number||''}" placeholder="e.g. S-ORD22-065203"/></div>
     <div class="fg"><label>Collection Date</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
-    <div class="fg"><label>Quantity to Draw (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Max shown after selecting release"/></div>
-    <div class="fg"><label>Transporter</label><select class="sel" id="f-trans-dd" onchange="filterTrucksDrawdown(this.value)"><option value="">— Select Transporter —</option>${DATA.transporters.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
-    <div class="fg"><label>Truck *</label><select class="sel" id="f-truck"><option value="">— Select truck —</option>${DATA.trucks.map(t=>`<option value="${t.registration_no}">${t.registration_no}${t.make_model?' ('+t.make_model+')':''}${t.max_capacity_litres?' — '+fmt(t.max_capacity_litres)+'L':''}</option>`).join('')}</select></div>
-    <div class="fg"><label>Driver Name</label><input class="inp" id="f-driver" value="${d.driver_name||''}"/></div>
-    <div class="fg"><label>Driver Phone</label><input class="inp" id="f-driverph" value="${d.driver_phone||''}"/></div>
-    <div class="fg"><label>No. of Compartments Used</label><input class="inp" type="number" id="f-comps" placeholder="e.g. 3"/></div>
-    <div class="fg"><label>Collection Reference (Depot)</label><input class="inp" id="f-cref" value="${d.collection_ref||''}"/></div>
+    <div class="fg"><label>Quantity to Draw (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Must not exceed duties paid qty"/></div>
+    <div class="fg"><label>Duties Paid Quantity (L)</label><input class="inp" type="number" id="f-duties-qty" value="${d.duties_qty||''}" placeholder="Quantity duties have been paid for"/></div>
+    <div class="fg"><label>Collection Reference (Depot No.)</label><input class="inp" id="f-cref" value="${d.collection_ref||''}"/></div>
     <div class="fg"><label>Collected By (Name)</label><input class="inp" id="f-colby" value="${d.collected_by||''}"/></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
@@ -1978,7 +2091,12 @@ const FORMS = {
     <div class="fg"><label>Invoice No</label><input class="inp" id="f-invno" value="${d.invoice_no||autoInvNo()}"/></div>
     <div class="fg"><label>Date</label><input class="inp" type="date" id="f-date" value="${d.invoice_date||today()}"/></div>
     <div class="fg"><label>Due Date</label><input class="inp" type="date" id="f-due" value="${d.due_date||''}"/></div>
-    <div class="fg full"><label>Release Order (link)</label><select class="sel" id="f-rel"><option value="">— Not linked —</option>${DATA.releases.map(r=>`<option value="${r.id}" ${d.release_order_id===r.id?'selected':''}>${r.release_no} – ${r.customer?.name||''}</option>`).join('')}</select></div>
+    <div class="fg full"><label>Release Order</label>
+      <select class="sel" id="f-rel" onchange="prefillInvoiceFromRelease(this.value)">
+        <option value="">— Select Release Order (auto-fills fields below) —</option>
+        ${DATA.releases.map(r=>`<option value="${r.id}" ${d.release_order_id===r.id?'selected':''}>${r.release_no}${r.sord_number?' · SORD: '+r.sord_number:''} – ${r.customer?.name||''} – ${fmt(r.quantity_requested||0)} L</option>`).join('')}
+      </select>
+    </div>
     <div class="fg"><label>Customer *</label><select class="sel" id="f-cust"><option value="">— Select —</option>${DATA.customers.map(c=>`<option value="${c.id}" ${d.customer_id===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Product</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Quantity (L)</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}"/></div>
@@ -1991,14 +2109,15 @@ const FORMS = {
 
   supplier: (d={})=>`<div class="fgrid">
     <div class="fg full"><label>Supplier Name *</label><input class="inp" id="f-name" value="${d.supplier_name||''}"/></div>
-    <div class="fg"><label>Supply Type *</label><select class="sel" id="f-suptype"><option value="Local" ${d.supply_type!=='Import'?'selected':''}>Local (Domestic Supplier)</option><option value="Import" ${d.supply_type==='Import'?'selected':''}>Import (External/Foreign Supplier)</option></select></div>
-    <div class="fg"><label>Invoice Reference *</label><input class="inp" id="f-ref" value="${d.invoice_number||autoRelNo().replace('REL','PO')}"/></div>
-    <div class="fg"><label>Invoice Date</label><input class="inp" type="date" id="f-date" value="${d.invoice_date||today()}"/></div>
+    <div class="fg"><label>Supply Type *</label><select class="sel" id="f-suptype"><option value="Local" ${d.supply_type!=='Import'?'selected':''}>Local (Domestic Supplier)</option><option value="Import" ${d.supply_type==='Import'?'selected':''}>Import (External/Foreign)</option></select></div>
+    <div class="fg"><label>Release Reference *</label><input class="inp" id="f-ref" value="${d.invoice_number||autoRelNo().replace('REL','PO')}" placeholder="Supplier release/invoice reference"/></div>
+    <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.invoice_date||today()}"/></div>
     <div class="fg"><label>Product *</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
-    <div class="fg"><label>Depot/Source</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
+    <div class="fg"><label>Source (Supplier/Origin)</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
+    <div class="fg"><label>Depot / Delivery Location</label><input class="inp" id="f-depot-loc" value="${d.depot_location||''}" placeholder="Where the fuel will be delivered to"/></div>
     <div class="fg"><label>Quantity Ordered (L)</label><input class="inp" type="number" id="f-qty" value="${d.quantity_ordered||''}"/></div>
     <div class="fg"><label>Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001"/></div>
-    <div class="fg"><label>Release Date (from Supplier)</label><input class="inp" type="date" id="f-exp" value="${d.expected_date||today()}"/></div>
+    <div class="fg"><label>Expected Delivery Date</label><input class="inp" type="date" id="f-exp" value="${d.expected_date||today()}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Received'?'selected':''}>Received</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`
@@ -2135,38 +2254,44 @@ async function saveCRUD() {
     if (!g('f-src'))  { toast('Please select a Source Depot','warning'); return; }
     if (!g('f-prod')) { toast('Please select a Product','warning'); return; }
     if (!qty)         { toast('Please enter a Quantity','warning'); return; }
+    const sig1Raw = g('f-signatory')||'';
+    const sig1 = sig1Raw==='__custom__' ? (g('f-signatory-custom')||'') : sig1Raw;
     payload={release_no:g('f-relno'),sord_number:g('f-sord'),release_date:g('f-date'),
       customer_id:g('f-cust')||null,source_id:g('f-src')||null,product_id:g('f-prod')||null,
       quantity_requested:qty,quantity_released:gn('f-qtyrel')||(_crudRecord?.quantity_released||0),
       unit_price:price,total_amount:qty*price,transporter_id:g('f-trans')||null,
       truck_registration:truckReg,trailer_registration:g('f-trailer'),
-      driver_name:g('f-driver'),driver_id_no:g('f-driverid'),
-      signatory:g('f-signatory'),signatory_title:g('f-sig-title'),
+      driver_name:g('f-driver-sel')||g('f-driver')||'',driver_id_no:g('f-driverid'),
+      signatory:sig1, signatory2:g('f-signatory2')||null, signatory3:g('f-signatory3')||null,
+      signatory_title:'',
       status:g('f-status')||'Draft',notes:g('f-notes')};
   }
   else if (type==='drawdown') {
-    const truckSel = document.getElementById('f-truck');
-    if (!g('f-rel')) { toast('Please select a Release Order','warning'); return; }
+    if (!g('f-sup-rel')) { toast('Please select a Supplier Release','warning'); return; }
     if (!gn('f-qty')){ toast('Please enter a Quantity to draw','warning'); return; }
-    payload={release_order_id:g('f-rel')||null,drawdown_date:g('f-date'),
-      quantity:gn('f-qty'),truck_registration:truckSel?truckSel.value:g('f-truck'),
-      driver_name:g('f-driver'),driver_phone:g('f-driverph'),
-      compartments_used:gn('f-comps'),collection_ref:g('f-cref'),
-      collected_by:g('f-colby'),notes:g('f-notes')};
-    // After saving drawdown, update release quantity_released
-    if (payload.release_order_id && payload.quantity) {
-      const rel = DATA.releases.find(r=>r.id===payload.release_order_id);
-      if (rel) {
-        const newReleased = (rel.quantity_released||0) + payload.quantity;
-        const newStatus = newReleased >= (rel.quantity_requested||0) ? 'Completed' : 'Partial';
+    payload={supplier_purchase_id:g('f-sup-rel')||null,
+      sord_number:g('f-sord-dd'),
+      drawdown_date:g('f-date'),
+      quantity:gn('f-qty'),
+      duties_qty:gn('f-duties-qty'),
+      collection_ref:g('f-cref'),
+      collected_by:g('f-colby'),
+      notes:g('f-notes')};
+    // After saving drawdown, update supplier_purchase quantity_drawn
+    if (payload.supplier_purchase_id && payload.quantity) {
+      const sup = DATA.suppliers.find(s=>s.id===payload.supplier_purchase_id);
+      if (sup) {
+        const newDrawn = (sup.quantity_drawn||0) + payload.quantity;
+        const newStatus = newDrawn >= (sup.quantity_ordered||0) ? 'Received' : 'Partial';
         setTimeout(async()=>{
-          await sb.from('release_orders').update({quantity_released:newReleased,status:newStatus}).eq('id',payload.release_order_id);
-          if (rel.source_id && rel.product_id) {
-            const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',rel.source_id).eq('product_id',rel.product_id).maybeSingle();
+          await sb.from('supplier_purchases').update({quantity_drawn:newDrawn,status:newStatus}).eq('id',payload.supplier_purchase_id);
+          // Update stock levels if source is known
+          if (sup.source_id && sup.product_id) {
+            const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',sup.source_id).eq('product_id',sup.product_id).maybeSingle();
             if (sl) {
-              const newBal = Math.max(0,(sl.current_balance||0)-payload.quantity);
+              const newBal = (sl.current_balance||0) + payload.quantity;
               await sb.from('stock_levels').update({current_balance:newBal,last_updated:new Date().toISOString()}).eq('id',sl.id);
-              await sb.from('stock_transactions').insert({source_id:rel.source_id,product_id:rel.product_id,transaction_type:'Drawdown',reference_no:rel.release_no,quantity:-payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'Auto: drawdown against '+rel.release_no});
+              await sb.from('stock_transactions').insert({source_id:sup.source_id,product_id:sup.product_id,transaction_type:'Intake',reference_no:payload.sord_number||sup.invoice_number,quantity:payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'SORD collection: '+(payload.sord_number||'—')});
             }
           }
           await loadAll(); renderPage(currentPage());
@@ -2629,67 +2754,104 @@ function viewInvoice(id) {
 }
 
 function buildReleaseForm(r, bal) {
-  return `<div class="pf-wrap" id="pf-rf-inner">
-    <div class="pf-hdr">
-      <div><div class="pf-co">FlowTrack</div><div style="font-size:8px;color:#6b7280;text-transform:uppercase;letter-spacing:.06em">Petroleum Intelligence Platform</div><div style="margin-top:6px;font-size:10px;color:#6b7280">Tel: +263 772 256 945 · admin@flowtrack.co.zw</div></div>
+  return `<div class="pf-wrap" id="pf-rf-inner" style="font-family:'DM Sans',Arial,sans-serif;background:#fff;color:#111;max-width:700px;margin:auto;padding:0">
+    <!-- Header: Customer letterhead -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px 14px;border-bottom:2px solid #0a0f1e">
       <div>
-        <div class="pf-dt">FUEL RELEASE ORDER</div>
-        <dl class="pf-rb">
-          <dt>Release No.</dt><dd>${r.release_no}</dd>
-          <dt style="margin-top:4px">SORD No. (NOIC)</dt><dd style="color:#e85d26;font-weight:800;font-size:13px">${r.sord_number||'—'}</dd>
-          <dt style="margin-top:4px">Date</dt><dd>${fmtDate(r.release_date)}</dd>
-          <dt style="margin-top:4px">Status</dt><dd>${r.status}</dd>
-        </dl>
+        <div style="font-size:18px;font-weight:800;color:#0a0f1e;letter-spacing:-.3px">${r.customer?.name||'— Customer —'}</div>
+        <div style="font-size:9px;color:#6b7280;margin-top:2px">${r.customer?.address||''}</div>
+        <div style="font-size:9px;color:#6b7280">${r.customer?.phone||''}</div>
+      </div>
+      <div style="text-align:right;font-size:10px;color:#374151">
+        <div>${fmtDate(r.release_date)}</div>
+        <div style="font-size:9px;color:#9ca3af;margin-top:3px">Ref: ${r.release_no}</div>
       </div>
     </div>
-    <div class="pf-info">
-      <div class="pf-bx"><div class="pf-bt">Issued To (Customer)</div><dl>
-        <div class="pf-row"><dt>Name</dt><dd>${r.customer?.name||'—'}</dd></div>
-        <div class="pf-row"><dt>TIN</dt><dd>${r.customer?.tin||'—'}</dd></div>
-      </dl></div>
-      <div class="pf-bx"><div class="pf-bt">Collection & Transport Details</div><dl>
-        <div class="pf-row"><dt>Source Depot</dt><dd>${r.source?.name||'—'}</dd></div>
-        <div class="pf-row"><dt>Transporter</dt><dd>${r.transporter?.name||'Own Collection'}</dd></div>
-        <div class="pf-row"><dt>Truck Reg.</dt><dd>${r.truck_registration||'—'}</dd></div>
-        <div class="pf-row"><dt>Trailer Reg.</dt><dd>${r.trailer_registration||'—'}</dd></div>
-        <div class="pf-row"><dt>Driver</dt><dd>${r.driver_name||'—'}</dd></div>
-        <div class="pf-row"><dt>Driver ID No.</dt><dd>${r.driver_id_no||'—'}</dd></div>
-      </dl></div>
+
+    <!-- Addressee -->
+    <div style="padding:14px 24px 8px;font-size:11px;line-height:1.7">
+      <div>The Depot Manager</div>
+      <div style="font-weight:700">National Oil Infrastructure Company of Zimbabwe</div>
+      <div>${r.source?.name||'Msasa'}</div>
     </div>
-    <div class="pf-tbl"><table>
-      <thead><tr><th>HS Code</th><th>Product</th><th>Qty Auth (L)</th><th>Qty Released (L)</th><th>Balance (L)</th><th>Unit Price (USD)</th><th>Total (USD)</th></tr></thead>
-      <tbody><tr>
-        <td>${r.product?.hs_code||'27101929'}</td><td>${r.product?.name||'—'}</td>
-        <td style="font-weight:700">${fmt(r.quantity_requested||0)}</td>
-        <td style="color:#059669;font-weight:700">${fmt(r.quantity_released||0)}</td>
-        <td style="color:#e85d26;font-weight:700">${fmt(bal)}</td>
-        <td>$${r.unit_price||0}</td>
-        <td style="font-weight:700">$${fmt(r.total_amount||0)}</td>
-      </tr></tbody>
-    </table></div>
-    <div class="pf-tots"><div class="pf-tb"><div class="lb">Authorised Release Value</div><div class="vl">USD $${fmt(r.total_amount||0)}</div></div></div>
-    <div class="pf-sigs">
-      <div class="pf-sig">
-        <div style="height:32px"></div>
-        <div class="pf-sig-l">Authorised Signatory</div>
-        <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:3px">${r.signatory||'_______________________'}</div>
-        <div style="font-size:9px;color:#6b7280;margin-top:1px">${r.signatory_title||'&nbsp;'}</div>
+    <div style="padding:0 24px 10px;font-size:11px">Dear Sir/Madam</div>
+
+    <!-- Uplift block -->
+    <div style="margin:0 24px;border:1.5px solid #0a0f1e;border-radius:6px;overflow:hidden">
+      <div style="background:#0a0f1e;color:#fff;padding:8px 14px;display:flex;align-items:baseline;gap:16px">
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.7">Uplift Number</span>
+        <span style="font-size:18px;font-weight:800;letter-spacing:-.3px">${r.release_no}</span>
       </div>
-      <div class="pf-sig">
-        <div style="height:32px"></div>
-        <div class="pf-sig-l">NOIC Depot Official</div>
-        <div style="font-size:10px;font-weight:600;margin-top:3px">_______________________</div>
-        <div style="font-size:9px;color:#6b7280;margin-top:1px">Stamp &amp; Date</div>
+      <div style="padding:10px 14px;font-size:11px">
+        Please allow <strong>${r.customer?.name||'—'}</strong> to uplift the products as detailed below.
       </div>
-      <div class="pf-sig">
-        <div style="height:32px"></div>
-        <div class="pf-sig-l">Driver / Receiver</div>
-        <div style="font-size:10px;font-weight:600;margin-top:3px">_______________________</div>
-        <div style="font-size:9px;color:#6b7280;margin-top:1px">${r.driver_name||''} · ID: ${r.driver_id_no||''}</div>
-      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-top:1px solid #e5e7eb">
+          <td style="padding:8px 14px;color:#374151;width:45%">Product</td>
+          <td style="padding:8px 14px;font-weight:700">${r.product?.name||'—'}</td>
+        </tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb">
+          <td style="padding:8px 14px;color:#374151">Quantity</td>
+          <td style="padding:8px 14px;font-weight:800;font-size:13px">${fmt(r.quantity_requested||0)} Litres</td>
+        </tr>
+        <tr style="border-top:1px solid #e5e7eb">
+          <td style="padding:8px 14px;color:#374151">NOIC Sales Order No.</td>
+          <td style="padding:8px 14px;font-weight:700;color:#e85d26">${r.sord_number||'— Pending SORD —'}</td>
+        </tr>
+        ${bal > 0 ? `<tr style="background:#fff7ed;border-top:1px solid #fed7aa">
+          <td style="padding:8px 14px;color:#92400e">Balance Remaining</td>
+          <td style="padding:8px 14px;font-weight:700;color:#e85d26">${fmt(bal)} Litres</td>
+        </tr>` : ''}
+      </table>
     </div>
-    <div style="padding:6px 22px;font-size:9px;color:#6b7280">This document authorises collection of the specified fuel quantity under NOIC SORD No. <strong>${r.sord_number||'N/A'}</strong>. Present at the depot with valid driver ID. Any alterations render this document void.</div>
-    <div class="pf-foot">FlowTrack Petroleum Intelligence · Harare, Zimbabwe · SORD: ${r.sord_number||'—'} · Single collection only · ${new Date().toLocaleString()}</div>
+
+    <!-- Transporter & Driver -->
+    <div style="margin:14px 24px 0;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <div style="background:#f4f5f8;padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151">Transporter and Truck Driver Details</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr><td style="padding:7px 14px;color:#374151;width:40%">Transporter</td><td style="padding:7px 14px;font-weight:700">${r.transporter?.name||'Own Collection'}</td></tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Driver's Name</td><td style="padding:7px 14px;font-weight:700">${r.driver_name||'—'}</td></tr>
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">ID Number</td><td style="padding:7px 14px;font-weight:700">${r.driver_id_no||'—'}</td></tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Vehicle Registration</td><td style="padding:7px 14px;font-weight:700">${r.truck_registration||'—'}</td></tr>
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Trailer Registration</td><td style="padding:7px 14px;font-weight:700">${r.trailer_registration||'—'}</td></tr>
+      </table>
+    </div>
+
+    <!-- Signatory -->
+    <div style="padding:14px 24px">
+      <div style="font-size:11px;color:#374151;margin-bottom:14px">For and on behalf of <strong>${r.customer?.name||'—'}</strong></div>
+      ${(()=>{
+        // Build array of active authorisers
+        const auths = [
+          { name: r.signatory, img: _signatures[r.signatory] },
+          r.signatory2 ? { name: r.signatory2, img: _signatures[r.signatory2] } : null,
+          r.signatory3 ? { name: r.signatory3, img: _signatures[r.signatory3] } : null,
+        ].filter(Boolean);
+        const cols = auths.length + 1; // +1 for NOIC
+        const colStyle = `display:grid;grid-template-columns:${Array(cols).fill('1fr').join(' ')};gap:24px`;
+        return `<div style="${colStyle}">
+          ${auths.map(a=>`
+            <div>
+              <div style="height:50px;border-bottom:1.5px solid #374151;margin-bottom:6px;display:flex;align-items:flex-end;padding-bottom:4px">
+                ${a.img ? `<img src="${a.img}" style="max-height:44px;max-width:120px;object-fit:contain"/>` :
+                `<span style="font-size:9px;color:#d1d5db;font-style:italic">No e-signature on file</span>`}
+              </div>
+              <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">Authorised Signatory</div>
+              <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">${a.name}</div>
+            </div>`).join('')}
+          <div>
+            <div style="height:50px;border-bottom:1.5px solid #374151;margin-bottom:6px"></div>
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">NOIC Depot Official — Signature &amp; Stamp</div>
+          </div>
+        </div>`;
+      })()}
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f4f5f8;padding:8px 24px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb">
+      <span>${r.customer?.phone||''} &nbsp;·&nbsp; ${r.customer?.address||''}</span>
+      <span>Generated by FlowTrack · ${new Date().toLocaleDateString('en-GB')}</span>
+    </div>
   </div>`;
 }
 
@@ -2882,8 +3044,72 @@ function exportCSV(type) {
 function downloadAllReports() { ['stock','releases','invoices','suppliers'].forEach((t,i)=>setTimeout(()=>exportCSV(t),i*350)); setTimeout(()=>toast('All reports downloaded','success'),1500); }
 
 // ═══════════════════════════════════════════
-// AUDIT LOG
+// ELECTRONIC SIGNATURES
 // ═══════════════════════════════════════════
+let _signatures = {}; // { signatoryName: dataURL }
+
+function loadSignatures() {
+  try {
+    const stored = localStorage.getItem('ft_signatures');
+    if (stored) _signatures = JSON.parse(stored);
+  } catch(e) {}
+}
+
+function saveSignatureStore() {
+  try { localStorage.setItem('ft_signatures', JSON.stringify(_signatures)); } catch(e) {}
+}
+
+function openSignaturePad(signatoryName) {
+  const name = signatoryName || _currentProfile?.full_name || 'Signatory';
+  const modal = document.getElementById('m-sigpad');
+  if (!modal) return;
+  document.getElementById('sigpad-name').textContent = name;
+  document.getElementById('sigpad-for').value = name;
+  const canvas = document.getElementById('sigpad-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Check existing
+  if (_signatures[name]) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img,0,0);
+    img.src = _signatures[name];
+  }
+  let drawing = false;
+  canvas.onmousedown = (e) => { drawing=true; ctx.beginPath(); ctx.moveTo(e.offsetX,e.offsetY); };
+  canvas.onmousemove = (e) => { if(!drawing) return; ctx.lineTo(e.offsetX,e.offsetY); ctx.strokeStyle='#0a0f1e'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke(); };
+  canvas.onmouseup = () => drawing=false;
+  canvas.onmouseleave = () => drawing=false;
+  // Touch support
+  canvas.ontouchstart = (e) => { e.preventDefault(); const t=e.touches[0]; const r=canvas.getBoundingClientRect(); drawing=true; ctx.beginPath(); ctx.moveTo(t.clientX-r.left,t.clientY-r.top); };
+  canvas.ontouchmove = (e) => { e.preventDefault(); if(!drawing) return; const t=e.touches[0]; const r=canvas.getBoundingClientRect(); ctx.lineTo(t.clientX-r.left,t.clientY-r.top); ctx.strokeStyle='#0a0f1e'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke(); };
+  canvas.ontouchend = () => drawing=false;
+  openModal('m-sigpad');
+}
+
+function clearSigPad() {
+  const canvas = document.getElementById('sigpad-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function saveSigPad() {
+  const canvas = document.getElementById('sigpad-canvas');
+  const name = document.getElementById('sigpad-for').value;
+  _signatures[name] = canvas.toDataURL('image/png');
+  saveSignatureStore();
+  closeModal('m-sigpad');
+  toast(`Signature saved for ${name}`, 'success');
+  // Refresh release form preview if open
+  const pf = document.getElementById('pf-rf');
+  if (pf && pf.innerHTML) {
+    const relId = pf.dataset.relId;
+    if (relId) viewRelease(relId);
+  }
+}
 async function logAction(action, entity, ref) {
   try { await sb.from('audit_logs').insert({action,entity_type:entity,entity_ref:ref,user_name:'Admin',created_at:new Date().toISOString()}); } catch(e){}
 }
@@ -3094,6 +3320,9 @@ async function onSignedIn() {
   // Reset login button for next time
   document.getElementById('login-btn').disabled = false;
   document.getElementById('login-btn').textContent = 'Sign In';
+
+  // Load stored signatures
+  loadSignatures();
 
   hideLoginScreen();
   document.getElementById('tb-dt').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
