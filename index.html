@@ -407,8 +407,8 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
     <div class="ni" data-page="blending"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 8C8 10 5.9 16.17 3.82 21H5.71c.51-1.2 1.06-2.38 1.7-3.47C9.18 20.02 11.65 21 14.5 21C18.65 21 22 17.65 22 13.5 22 10.55 20.36 7.99 17 8z"/></svg>Blending Calc</div>
     <div class="nl">Operations</div>
     <div class="ni" data-page="suppliers"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg>Supplier Releases</div>
-    <div class="ni" data-page="releases"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>Release Orders<span class="nbadge" id="rb">0</span></div>
     <div class="ni" data-page="drawdowns"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7z"/></svg>SORD Tracker</div>
+    <div class="ni" data-page="releases"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>Release Orders<span class="nbadge" id="rb">0</span></div>
     <div class="ni" data-page="approvals"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Approvals<span class="nbadge" id="ab">0</span></div>
     <div class="nl">Finance</div>
     <div class="ni" data-page="invoices"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>Invoices</div>
@@ -518,7 +518,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 <section class="page" id="page-suppliers">
   <div class="sh"><div class="st">Supplier Release Balances</div><button class="btn btn-b btn-sm" onclick="openCRUD('supplier',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>New Purchase Order</button></div>
   <div class="g3 mb4" id="supplier-cards"></div>
-  <div class="card"><div class="st mb4">Supplier Invoice Register</div><div class="tw"><table><thead><tr><th>Supplier</th><th>Invoice Ref</th><th>Product</th><th>Ordered (L)</th><th>Drawn (L)</th><th>Balance (L)</th><th>Status</th><th></th></tr></thead><tbody id="supplier-tbl"><tr><td colspan="8" class="empty">No supplier records yet. Add a Purchase Order to begin.</td></tr></tbody></table></div></div>
+  <div class="card"><div class="st mb4">Supplier Invoice Register</div><div class="tw"><table><thead><tr><th>Supplier</th><th>Invoice Ref</th><th>Delivery</th><th>Product</th><th>Ordered (L)</th><th>Drawn (L)</th><th>Balance (L)</th><th>Product Value</th><th>Duty (USD)</th><th>Total (USD)</th><th>Status</th><th></th></tr></thead><tbody id="supplier-tbl"><tr><td colspan="12" class="empty">No supplier records yet.</td></tr></tbody></table></div></div>
 </section>
 
 <!-- RELEASES -->
@@ -531,7 +531,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 <!-- DRAWDOWNS / SORD TRACKER -->
 <section class="page" id="page-drawdowns">
   <div class="sh"><div><div class="st">SORD Tracker</div><div class="ss">Track collections against approved NOIC SORDs. Each drawdown reduces the SORD balance and updates stock levels automatically.</div></div><button class="btn btn-b btn-sm" onclick="openCRUD('drawdown',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Record Collection</button></div>
-  <div class="tw"><table><thead><tr><th>Release No</th><th>SORD No.</th><th>Collection Date</th><th>Customer</th><th>Product</th><th>Qty Drawn (L)</th><th>SORD Balance (L)</th><th>Truck</th><th>Driver</th><th>Collection Ref</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="11" class="empty">No collections recorded yet.</td></tr></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>SORD No.</th><th>Date Received</th><th>Supplier</th><th>Product</th><th>Volume (L)</th><th>SORD Balance (L)</th><th>Collected By</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="8" class="empty">No SORD entries yet.</td></tr></tbody></table></div>
 </section>
 
 <!-- APPROVALS -->
@@ -889,7 +889,7 @@ async function loadAll() {
       sb.from('stock_levels').select('*,source:sources(name,type),product:products(name,unit)'),
       sb.from('stock_transactions').select('*,source:sources(name),product:products(name)').order('created_at',{ascending:false}).limit(50),
       sb.from('release_orders').select('*,customer:customers(name,tin),source:sources(name),product:products(name,hs_code),transporter:transporters(name)').order('created_at',{ascending:false}),
-      sb.from('release_drawdowns').select('*,release_order:release_orders(release_no,customer:customers(name),product:products(name))').order('created_at',{ascending:false}),
+      sb.from('release_drawdowns').select('*,release_order:release_orders(release_no,customer:customers(name),product:products(name)),supplier:supplier_purchases(supplier_name,invoice_number,quantity_ordered,quantity_drawn,product:products(name))').order('created_at',{ascending:false}),
       sb.from('invoices').select('*,customer:customers(name),product:products(name,hs_code),release_order:release_orders(release_no)').order('created_at',{ascending:false}),
       sb.from('supplier_purchases').select('*,source:sources(name),product:products(name)').order('created_at',{ascending:false}),
       sb.from('blending_records').select('*').order('created_at',{ascending:false}),
@@ -1146,8 +1146,16 @@ function renderSuppliers() {
   if (cards) cards.innerHTML = DATA.suppliers.length ? DATA.suppliers.map(s=>{
     const pct = s.quantity_ordered>0 ? Math.round((s.quantity_drawn||0)/s.quantity_ordered*100):0;
     const bal = (s.quantity_ordered||0)-(s.quantity_drawn||0);
+    const prodVal = (s.quantity_ordered||0)*(s.unit_price||0);
+    const dutyAmt = s.duty_amount||0;
     return `<div class="card" style="border-left:4px solid var(--brand)">
-      <div class="st mb2" style="font-size:.83rem">${s.supplier_name||'—'}</div>
+      <div class="flex jsb aic mb2">
+        <div class="st" style="font-size:.83rem">${s.supplier_name||'—'}</div>
+        <div class="flex gap2">
+          <span class="badge ${s.supply_type==='Import'?'bp':'bb'}" style="font-size:.6rem">${s.supply_type||'Local'}</span>
+          <span class="badge bgr" style="font-size:.6rem">${s.delivery_method||'Road'}</span>
+        </div>
+      </div>
       <div class="txs tmut mb3">${s.product?.name||''} · ${s.invoice_number||''}</div>
       <div class="g3" style="gap:8px;margin-bottom:10px">
         <div><div class="txs tmut">Ordered</div><div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:800">${fmt(s.quantity_ordered||0)} L</div></div>
@@ -1155,28 +1163,38 @@ function renderSuppliers() {
         <div><div class="txs tmut">Balance</div><div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;color:var(--em)">${fmt(bal)} L</div></div>
       </div>
       <div class="pb"><div class="pf ${pct>80?'r':pct>50?'a':'g'}" style="width:${pct}%"></div></div>
-      <div class="txs tmut mt2">${pct}% utilised</div>
+      <div class="txs tmut mt2 mb2">${pct}% utilised</div>
+      ${dutyAmt>0?`<div class="txs tmut" style="border-top:1px solid var(--bdr);padding-top:8px;margin-top:6px">
+        Product: $${fmt(prodVal)} · Duty: $${fmt(dutyAmt)} · <strong>Total: $${fmt(s.total_amount||prodVal+dutyAmt)}</strong>
+      </div>`:''}
+      <div class="flex gap2 mt3">
+        <button class="btn btn-o btn-sm" onclick="openCRUD('supplier','${s.id}')">Edit</button>
+        <button class="btn btn-d btn-sm" onclick="confirmDelete('supplier_purchases','${s.id}','${s.supplier_name}')">Delete</button>
+      </div>
     </div>`;
   }).join('') : '<div class="empty" style="grid-column:1/-1">No supplier records yet.</div>';
 
   const tbl = document.getElementById('supplier-tbl');
   if (tbl) tbl.innerHTML = DATA.suppliers.length ? DATA.suppliers.map(s=>{
     const bal = (s.quantity_ordered||0)-(s.quantity_drawn||0);
-    const pct = s.quantity_ordered>0 ? Math.round(bal/s.quantity_ordered*100):0;
     return `<tr>
       <td class="tbld">${s.supplier_name||'—'}</td>
       <td class="mono">${s.invoice_number||'—'}</td>
+      <td><span class="badge bgr" style="font-size:.65rem">${s.delivery_method||'Road'}</span></td>
       <td>${s.product?.name||'—'}</td>
       <td>${fmt(s.quantity_ordered||0)}</td>
       <td style="color:var(--brand);font-weight:600">${fmt(s.quantity_drawn||0)}</td>
       <td style="color:var(--em);font-weight:700">${fmt(bal)}</td>
+      <td class="txs">$${fmt((s.quantity_ordered||0)*(s.unit_price||0))}</td>
+      <td class="txs">$${fmt(s.duty_amount||0)}</td>
+      <td class="txs" style="font-weight:700">$${fmt(s.total_amount||0)}</td>
       <td><span class="badge ${s.status==='Received'?'bg':s.status==='Partial'?'ba':'bb'}">${s.status||'Pending'}</span></td>
       <td><div class="flex gap2">
-        <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('supplier','${s.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-        <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('supplier_purchase','${s.id}','${s.supplier_name}')" title="Delete"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+        <button class="btn btn-g btn-sm btn-icon" onclick="openCRUD('supplier','${s.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+        <button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('supplier_purchases','${s.id}','${s.supplier_name}')" title="Delete"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       </div></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">No supplier records yet.</td></tr>';
+  }).join('') : '<tr><td colspan="12" class="empty">No supplier records yet.</td></tr>';
 }
 
 function renderReleases(filter) {
@@ -1251,22 +1269,23 @@ function renderDrawdowns() {
   const tbl = document.getElementById('dd-tbl');
   if (!tbl) return;
   tbl.innerHTML = DATA.drawdowns.length ? DATA.drawdowns.map(d=>{
-    const rel = DATA.releases.find(r=>r.id===d.release_order_id);
-    const sordBal = rel ? (rel.quantity_requested||0)-(rel.quantity_released||0) : null;
+    // Link to supplier purchase
+    const sup = DATA.suppliers.find(s=>s.id===d.supplier_purchase_id) ||
+                DATA.suppliers.find(s=>s.id===d.release_order_id); // fallback
+    const totalOrdered = sup?.quantity_ordered || 0;
+    const totalDrawn = sup?.quantity_drawn || 0;
+    const sordBal = totalOrdered - totalDrawn;
     return `<tr>
-      <td class="mono tbld">${d.release_order?.release_no||rel?.release_no||'—'}</td>
-      <td class="mono" style="color:var(--brand);font-weight:700">${rel?.sord_number||'—'}</td>
+      <td class="mono" style="color:var(--brand);font-weight:700">${d.sord_number||'—'}</td>
       <td>${fmtDate(d.drawdown_date)}</td>
-      <td>${d.release_order?.customer?.name||rel?.customer?.name||'—'}</td>
-      <td>${d.release_order?.product?.name||rel?.product?.name||'—'}</td>
-      <td style="font-weight:700;color:var(--em)">${fmt(d.quantity||0)}</td>
-      <td style="font-weight:700;color:${sordBal===0?'var(--em)':'var(--brand)'}">${sordBal!==null?fmt(sordBal)+' L':'—'} ${sordBal===0?'✓ Fully Drawn':''}</td>
-      <td class="mono">${d.truck_registration||'—'}</td>
-      <td>${d.driver_name||'—'}</td>
-      <td class="mono">${d.collection_ref||'—'}</td>
-      <td><button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_drawdowns','${d.id}','Collection')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
+      <td class="tbld">${sup?.supplier_name||'—'}</td>
+      <td>${sup?.product?.name||d.release_order?.product?.name||'—'}</td>
+      <td style="font-weight:700;color:var(--em)">${fmt(d.quantity||0)} L</td>
+      <td style="font-weight:700;color:${sordBal<=0?'var(--em)':'var(--brand)'}">${fmt(Math.max(0,sordBal))} L ${sordBal<=0?'<span class="badge bg" style="font-size:.6rem">Fully Drawn</span>':''}</td>
+      <td>${d.collected_by||'—'}</td>
+      <td><button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_drawdowns','${d.id}','SORD ${d.sord_number||'entry'}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="11" class="empty">No collections recorded yet.</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">No SORD entries yet. Record a collection above.</td></tr>';
 }
 
 function renderApprovals() {
@@ -1290,7 +1309,11 @@ function renderApprovals() {
         <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Total Value</div><div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--brand);margin-top:4px">USD $${fmt(r.total_amount||0)}</div></div>
         <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Truck / Trailer</div><div class="tbld mt1">${r.truck_registration||'—'}${r.trailer_registration?' / '+r.trailer_registration:''}</div></div>
         <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Driver</div><div class="tbld mt1">${r.driver_name||'—'} ${r.driver_id_no?'· ID: '+r.driver_id_no:''}</div></div>
-        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Signatory</div><div class="tbld mt1">${r.signatory||'—'}</div><div class="txs tmut">${r.signatory_title||''}</div></div>
+        <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Signatory / Authoriser</div>
+          <div class="tbld mt1">${r.signatory||'—'}</div>
+          ${r.signatory2?`<div class="txs" style="color:var(--mut);margin-top:2px">${r.signatory2}</div>`:''}
+          ${r.signatory3?`<div class="txs" style="color:var(--mut);margin-top:2px">${r.signatory3}</div>`:''}
+        </div>
         <div style="background:var(--sur);border-radius:9px;padding:11px"><div class="txs tmut">Transporter</div><div class="tbld mt1">${r.transporter?.name||'Own Collection'}</div></div>
       </div>
       <div class="flex gap2" style="flex-wrap:wrap">
@@ -1691,22 +1714,25 @@ function adminTab(tab, el) {
   };
 
   if (tab === 'settings') {
-    content.innerHTML = `<div class="card"><div class="st mb4">System Settings</div>
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ft_company')||'{}'); } catch(e){}
+    content.innerHTML = `<div class="card"><div class="st mb4">Company Settings</div>
       <div class="fgrid">
-        <div class="fg"><label>Company Name</label><input class="inp" id="cfg-name" value="FlowTrack Petroleum"/></div>
-        <div class="fg"><label>Company TIN</label><input class="inp" id="cfg-tin"/></div>
-        <div class="fg"><label>VAT Reg No.</label><input class="inp" id="cfg-vat"/></div>
-        <div class="fg"><label>Default Currency</label><select class="sel" id="cfg-cur"><option>USD</option><option>ZiG</option></select></div>
-        <div class="fg"><label>Payment Terms (days)</label><input class="inp" type="number" id="cfg-terms" value="14"/></div>
-        <div class="fg"><label>Low Stock Alert Threshold (L)</label><input class="inp" type="number" id="cfg-low" value="5000"/></div>
-        <div class="fg"><label>Bank Name</label><input class="inp" id="cfg-bank"/></div>
-        <div class="fg"><label>Account Number</label><input class="inp" id="cfg-acc"/></div>
-        <div class="fg"><label>SWIFT Code</label><input class="inp" id="cfg-swift"/></div>
-        <div class="fg"><label>Branch</label><input class="inp" id="cfg-branch"/></div>
-        <div class="fg"><label>Company Address</label><input class="inp" id="cfg-addr"/></div>
-        <div class="fg"><label>Contact Phone</label><input class="inp" id="cfg-phone"/></div>
+        <div class="fg full"><label>Company Name</label><input class="inp" id="cfg-name" value="${saved.name||'FlowTrack Petroleum'}"/></div>
+        <div class="fg"><label>Company TIN</label><input class="inp" id="cfg-tin" value="${saved.tin||''}"/></div>
+        <div class="fg"><label>VAT Reg No.</label><input class="inp" id="cfg-vat" value="${saved.vat||''}"/></div>
+        <div class="fg full"><label>Company Address</label><input class="inp" id="cfg-addr" value="${saved.address||''}"/></div>
+        <div class="fg"><label>Contact Phone</label><input class="inp" id="cfg-phone" value="${saved.phone||''}"/></div>
+        <div class="fg"><label>Contact Email</label><input class="inp" id="cfg-email" value="${saved.email||''}"/></div>
+        <div class="fg"><label>Default Currency</label><select class="sel" id="cfg-cur"><option ${saved.currency==='USD'||!saved.currency?'selected':''}>USD</option><option ${saved.currency==='ZiG'?'selected':''}>ZiG</option></select></div>
+        <div class="fg"><label>Payment Terms (days)</label><input class="inp" type="number" id="cfg-terms" value="${saved.terms||14}"/></div>
+        <div class="fg"><label>Low Stock Alert Threshold (L)</label><input class="inp" type="number" id="cfg-low" value="${saved.low_stock||5000}"/></div>
+        <div class="fg"><label>Bank Name</label><input class="inp" id="cfg-bank" value="${saved.bank||''}"/></div>
+        <div class="fg"><label>Account Number</label><input class="inp" id="cfg-acc" value="${saved.acc||''}"/></div>
+        <div class="fg"><label>SWIFT Code</label><input class="inp" id="cfg-swift" value="${saved.swift||''}"/></div>
+        <div class="fg"><label>Branch</label><input class="inp" id="cfg-branch" value="${saved.branch||''}"/></div>
       </div>
-      <button class="btn btn-b mt4" onclick="toast('Settings saved','success')">Save Settings</button>
+      <button class="btn btn-b mt4" onclick="saveSettings()">Save Settings</button>
     </div>`;
     return;
   }
@@ -1772,6 +1798,30 @@ function prefillInvoiceFromRelease(releaseId) {
   set('f-qty', r.quantity_requested || '');
   set('f-price', r.unit_price || '');
   toast('Customer, product, quantity and price filled from ' + r.release_no, 'success');
+}
+
+function saveSettings() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const cfg = {
+    name: g('cfg-name'), tin: g('cfg-tin'), vat: g('cfg-vat'),
+    address: g('cfg-addr'), phone: g('cfg-phone'), email: g('cfg-email'),
+    currency: g('cfg-cur'), terms: g('cfg-terms'), low_stock: g('cfg-low'),
+    bank: g('cfg-bank'), acc: g('cfg-acc'), swift: g('cfg-swift'), branch: g('cfg-branch')
+  };
+  try { localStorage.setItem('ft_company', JSON.stringify(cfg)); } catch(e){}
+  toast('Company settings saved', 'success');
+}
+
+function calcSupplierTotal() {
+  const qty = parseFloat(document.getElementById('f-qty')?.value) || 0;
+  const price = parseFloat(document.getElementById('f-price')?.value) || 0;
+  const dutyRate = parseFloat(document.getElementById('f-duty-rate')?.value) || 0;
+  const dutyAmt = qty * dutyRate;
+  const total = qty * price + dutyAmt;
+  const da = document.getElementById('f-duty-amount');
+  const ta = document.getElementById('f-total-amount');
+  if (da) da.value = dutyAmt ? dutyAmt.toFixed(2) : '';
+  if (ta) ta.value = total ? total.toFixed(2) : '';
 }
 
 function prefillDrawdownFromSupplier(supplierId) {
@@ -2079,10 +2129,8 @@ const FORMS = {
       </select>
     </div>
     <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord-dd" value="${d.sord_number||''}" placeholder="e.g. S-ORD22-065203"/></div>
-    <div class="fg"><label>Collection Date</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
-    <div class="fg"><label>Quantity to Draw (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Must not exceed duties paid qty"/></div>
-    <div class="fg"><label>Duties Paid Quantity (L)</label><input class="inp" type="number" id="f-duties-qty" value="${d.duties_qty||''}" placeholder="Quantity duties have been paid for"/></div>
-    <div class="fg"><label>Collection Reference (Depot No.)</label><input class="inp" id="f-cref" value="${d.collection_ref||''}"/></div>
+    <div class="fg"><label>Date (Date SORD Received)</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
+    <div class="fg"><label>Volume (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Quantity on this SORD"/></div>
     <div class="fg"><label>Collected By (Name)</label><input class="inp" id="f-colby" value="${d.collected_by||''}"/></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
@@ -2110,13 +2158,17 @@ const FORMS = {
   supplier: (d={})=>`<div class="fgrid">
     <div class="fg full"><label>Supplier Name *</label><input class="inp" id="f-name" value="${d.supplier_name||''}"/></div>
     <div class="fg"><label>Supply Type *</label><select class="sel" id="f-suptype"><option value="Local" ${d.supply_type!=='Import'?'selected':''}>Local (Domestic Supplier)</option><option value="Import" ${d.supply_type==='Import'?'selected':''}>Import (External/Foreign)</option></select></div>
+    <div class="fg"><label>Delivery Method</label><select class="sel" id="f-delivery"><option value="Road" ${d.delivery_method==='Road'?'selected':''}>Road</option><option value="Pipeline" ${d.delivery_method==='Pipeline'?'selected':''}>Pipeline</option><option value="Rail" ${d.delivery_method==='Rail'?'selected':''}>Rail</option></select></div>
     <div class="fg"><label>Release Reference *</label><input class="inp" id="f-ref" value="${d.invoice_number||autoRelNo().replace('REL','PO')}" placeholder="Supplier release/invoice reference"/></div>
     <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.invoice_date||today()}"/></div>
     <div class="fg"><label>Product *</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Source (Supplier/Origin)</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Depot / Delivery Location</label><input class="inp" id="f-depot-loc" value="${d.depot_location||''}" placeholder="Where the fuel will be delivered to"/></div>
-    <div class="fg"><label>Quantity Ordered (L)</label><input class="inp" type="number" id="f-qty" value="${d.quantity_ordered||''}"/></div>
-    <div class="fg"><label>Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001"/></div>
+    <div class="fg"><label>Quantity Ordered (L)</label><input class="inp" type="number" id="f-qty" value="${d.quantity_ordered||''}" oninput="calcSupplierTotal()"/></div>
+    <div class="fg"><label>Product Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001" oninput="calcSupplierTotal()"/></div>
+    <div class="fg"><label>Duty Rate (USD/L)</label><input class="inp" type="number" id="f-duty-rate" value="${d.duty_rate||''}" step="0.0001" placeholder="Duty per litre" oninput="calcSupplierTotal()"/></div>
+    <div class="fg"><label>Total Duty Amount (USD)</label><input class="inp" type="number" id="f-duty-amount" value="${d.duty_amount||''}" placeholder="Auto-calculated" readonly style="background:var(--sur)"/></div>
+    <div class="fg"><label>Total Invoice Amount (USD)</label><input class="inp" type="number" id="f-total-amount" value="${d.total_amount||''}" placeholder="Product + Duty" readonly style="background:var(--sur);font-weight:700"/></div>
     <div class="fg"><label>Expected Delivery Date</label><input class="inp" type="date" id="f-exp" value="${d.expected_date||today()}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Received'?'selected':''}>Received</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
@@ -2268,13 +2320,11 @@ async function saveCRUD() {
   }
   else if (type==='drawdown') {
     if (!g('f-sup-rel')) { toast('Please select a Supplier Release','warning'); return; }
-    if (!gn('f-qty')){ toast('Please enter a Quantity to draw','warning'); return; }
+    if (!gn('f-qty')){ toast('Please enter a Volume','warning'); return; }
     payload={supplier_purchase_id:g('f-sup-rel')||null,
       sord_number:g('f-sord-dd'),
       drawdown_date:g('f-date'),
       quantity:gn('f-qty'),
-      duties_qty:gn('f-duties-qty'),
-      collection_ref:g('f-cref'),
       collected_by:g('f-colby'),
       notes:g('f-notes')};
     // After saving drawdown, update supplier_purchase quantity_drawn
@@ -2313,11 +2363,20 @@ async function saveCRUD() {
     const qty=gn('f-qty')||0,price=gn('f-price')||0;
     if (!g('f-name')) { toast('Please enter a Supplier Name','warning'); return; }
     const supRef = g('f-ref') || ('PO-'+Date.now());
+    const supQty = gn('f-qty')||0;
+    const supPrice = gn('f-price')||0;
+    const dutyRate = gn('f-duty-rate')||0;
+    const dutyAmt = supQty * dutyRate;
+    const totalAmt = supQty * supPrice + dutyAmt;
     payload={supplier_name:g('f-name'),supply_type:g('f-suptype')||'Local',
+      delivery_method:g('f-delivery')||'Road',
       reference_no:supRef,
       invoice_number:supRef,invoice_date:g('f-date'),
       product_id:g('f-prod')||null,source_id:g('f-src')||null,
-      quantity_ordered:qty,unit_price:price,total_amount:qty*price,
+      depot_location:g('f-depot-loc'),
+      quantity_ordered:supQty,unit_price:supPrice,
+      duty_rate:dutyRate,duty_amount:dutyAmt,
+      total_amount:totalAmt,
       expected_date:g('f-exp')||null,status:g('f-status')||'Pending',notes:g('f-notes')};
   }
 
@@ -2523,6 +2582,7 @@ function getReportRows(type) {
     stations: {heads:['Station','Type','Province','Capacity (L)','Status'],rows:DATA.sites.map(s=>[s.name,s.type,s.province?.name||'',s.tank_capacity||0,s.is_active?'Active':'Inactive'])},
     trucks: {heads:['Reg No','Transporter','Capacity (L)','Compartments','Driver','Status'],rows:DATA.trucks.map(t=>[t.registration_no,t.transporter?.name||'',t.max_capacity_litres||0,t.compartments||0,t.default_driver||'',t.is_active!==false?'Active':'Inactive'])},
     sector_product: null,
+    sector_province: null,
     province_product: null,
     local_import: null
   };
@@ -2556,35 +2616,6 @@ function buildReportHTML(type, label) {
   ${tableHTML}
   <div class="foot">FlowTrack Petroleum Intelligence · Harare, Zimbabwe · This report is computer-generated</div>
   </body></html>`;
-}
-
-function exportCSVGetRows(type) {
-  // For computed reports — return the row arrays
-  const all = {
-    sector_product: (()=>{
-      const sectors=[...new Set(DATA.customers.map(c=>c.sector?.name||'Unknown'))].sort();
-      const products=[...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
-      const rows=[['Sector',...products,'Total (L)']];
-      sectors.forEach(sec=>{const ids=DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec).map(c=>c.id);const rels=DATA.releases.filter(r=>ids.includes(r.customer_id));const row=[sec];let tot=0;products.forEach(p=>{const v=rels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);row.push(v);tot+=v;});row.push(tot);rows.push(row);});return rows;
-    })(),
-    province_product: (()=>{
-      const provs=[...new Set(DATA.customers.map(c=>c.province?.name||'Unknown'))].sort();
-      const products=[...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
-      const rows=[['Province',...products,'Total (L)']];
-      provs.forEach(prov=>{const ids=DATA.customers.filter(c=>(c.province?.name||'Unknown')===prov).map(c=>c.id);const rels=DATA.releases.filter(r=>ids.includes(r.customer_id));const row=[prov];let tot=0;products.forEach(p=>{const v=rels.filter(r=>(r.product?.name||'Unknown')===p).reduce((s,r)=>s+(r.quantity_released||0),0);row.push(v);tot+=v;});row.push(tot);rows.push(row);});return rows;
-    })(),
-    local_import: (()=>{
-      const local=DATA.suppliers.filter(s=>s.supply_type!=='Import');
-      const imports=DATA.suppliers.filter(s=>s.supply_type==='Import');
-      const rows=[['Supply Type','Supplier','Product','Ordered (L)','Drawn (L)','Balance (L)','Value (USD)','Status']];
-      [...local,...imports].forEach(s=>{rows.push([s.supply_type||'Local',s.supplier_name||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.total_amount||0,s.status||'']);});
-      rows.push([]);
-      rows.push(['SUMMARY — Local','','',' '+local.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+local.reduce((s,x)=>s+(x.total_amount||0),0),'']);
-      rows.push(['SUMMARY — Import','','',' '+imports.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','','$'+imports.reduce((s,x)=>s+(x.total_amount||0),0),'']);
-      return rows;
-    })()
-  };
-  return all[type] || [];
 }
 
 function printReport(type, label) {
@@ -2754,7 +2785,103 @@ function viewInvoice(id) {
 }
 
 function buildReleaseForm(r, bal) {
+  // Get company settings from config (stored in localStorage by settings page)
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem('ft_company')||'{}'); } catch(e){}
+  const companyName = cfg.name || 'FlowTrack Petroleum';
+  const companyAddr = cfg.address || 'Harare, Zimbabwe';
+  const companyPhone = cfg.phone || '+263 772 256 945';
+  const companyEmail = cfg.email || '';
+  const companyTin = cfg.tin || '';
+
+  // Get authoriser details from users
+  const getUser = (name) => DATA.users.find(u=>u.full_name===name);
+  const auth1 = getUser(r.signatory);
+  const auth2 = r.signatory2 ? getUser(r.signatory2) : null;
+  const auth3 = r.signatory3 ? getUser(r.signatory3) : null;
+  const auths = [
+    r.signatory ? { name:r.signatory, phone:auth1?.phone||'', img:_signatures[r.signatory]||null } : null,
+    r.signatory2 ? { name:r.signatory2, phone:auth2?.phone||'', img:_signatures[r.signatory2]||null } : null,
+    r.signatory3 ? { name:r.signatory3, phone:auth3?.phone||'', img:_signatures[r.signatory3]||null } : null,
+  ].filter(Boolean);
+  const sigCols = `repeat(${auths.length},1fr)`;
+
   return `<div class="pf-wrap" id="pf-rf-inner" style="font-family:'DM Sans',Arial,sans-serif;background:#fff;color:#111;max-width:700px;margin:auto;padding:0">
+    <!-- Header: Company letterhead (not customer) -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px 14px;border-bottom:2px solid #0a0f1e">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:#0a0f1e;letter-spacing:-.3px">${companyName}</div>
+        <div style="font-size:9px;color:#6b7280;margin-top:2px">${companyAddr}</div>
+        <div style="font-size:9px;color:#6b7280">${companyPhone}${companyEmail?' · '+companyEmail:''}</div>
+        ${companyTin?`<div style="font-size:9px;color:#6b7280">TIN: ${companyTin}</div>`:''}
+      </div>
+      <div style="text-align:right;font-size:10px;color:#374151">
+        <div>${fmtDate(r.release_date)}</div>
+        <div style="font-size:9px;color:#9ca3af;margin-top:3px">Ref: ${r.release_no}</div>
+      </div>
+    </div>
+
+    <!-- Addressee -->
+    <div style="padding:14px 24px 4px;font-size:11px;line-height:1.8">
+      <div>The Depot Manager</div>
+      <div style="font-weight:700">National Oil Infrastructure Company of Zimbabwe</div>
+      <div>${r.source?.name||'Msasa'}</div>
+    </div>
+    <div style="padding:4px 24px 12px;font-size:11px">Dear Sir/Madam</div>
+
+    <!-- Uplift block -->
+    <div style="margin:0 24px;border:1.5px solid #0a0f1e;border-radius:6px;overflow:hidden">
+      <div style="background:#0a0f1e;color:#fff;padding:8px 14px;display:flex;align-items:baseline;gap:16px">
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.7">Uplift Number</span>
+        <span style="font-size:18px;font-weight:800">${r.release_no}</span>
+      </div>
+      <div style="padding:10px 14px;font-size:11px">
+        Please allow <strong>${r.customer?.name||'—'}</strong> to uplift the products as detailed below.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151;width:45%">Product</td><td style="padding:7px 14px;font-weight:700">${r.product?.name||'—'}</td></tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Quantity</td><td style="padding:7px 14px;font-weight:800;font-size:13px">${fmt(r.quantity_requested||0)} Litres</td></tr>
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">NOIC Sales Order No.</td><td style="padding:7px 14px;font-weight:700;color:#e85d26">${r.sord_number||'— Pending —'}</td></tr>
+        ${bal>0?`<tr style="background:#fff7ed;border-top:1px solid #fed7aa"><td style="padding:7px 14px;color:#92400e">Balance Remaining</td><td style="padding:7px 14px;font-weight:700;color:#e85d26">${fmt(bal)} Litres</td></tr>`:''}
+      </table>
+    </div>
+
+    <!-- Transporter & Driver -->
+    <div style="margin:14px 24px 0;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <div style="background:#f4f5f8;padding:7px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151">Transporter and Truck Driver Details</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr><td style="padding:6px 14px;color:#374151;width:40%">Transporter</td><td style="padding:6px 14px;font-weight:700">${r.transporter?.name||'Own Collection'}</td></tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:6px 14px;color:#374151">Driver's Name</td><td style="padding:6px 14px;font-weight:700">${r.driver_name||'—'}</td></tr>
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:6px 14px;color:#374151">ID Number</td><td style="padding:6px 14px;font-weight:700">${r.driver_id_no||'—'}</td></tr>
+        <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:6px 14px;color:#374151">Vehicle Registration</td><td style="padding:6px 14px;font-weight:700">${r.truck_registration||'—'}</td></tr>
+        <tr style="border-top:1px solid #e5e7eb"><td style="padding:6px 14px;color:#374151">Trailer Registration</td><td style="padding:6px 14px;font-weight:700">${r.trailer_registration||'—'}</td></tr>
+      </table>
+    </div>
+
+    <!-- Authorisers - dynamic columns -->
+    <div style="padding:14px 24px">
+      <div style="font-size:11px;color:#374151;margin-bottom:14px">For and on behalf of <strong>${companyName}</strong></div>
+      <div style="display:grid;grid-template-columns:${sigCols};gap:20px">
+        ${auths.map(a=>`
+          <div>
+            <div style="height:52px;border-bottom:1.5px solid #374151;margin-bottom:6px;display:flex;align-items:flex-end;padding-bottom:4px">
+              ${a.img?`<img src="${a.img}" style="max-height:46px;max-width:130px;object-fit:contain"/>`:
+              `<span style="font-size:9px;color:#d1d5db;font-style:italic">No e-signature</span>`}
+            </div>
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">Authorised Signatory</div>
+            <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">${a.name}</div>
+            ${a.phone?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${a.phone}</div>`:''}
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f4f5f8;padding:8px 24px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:6px">
+      <span>${companyPhone}${companyEmail?' · '+companyEmail:''}</span>
+      <span>Generated by FlowTrack · ${new Date().toLocaleDateString('en-GB')}</span>
+    </div>
+  </div>`;
+}
     <!-- Header: Customer letterhead -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px 14px;border-bottom:2px solid #0a0f1e">
       <div>
@@ -2966,73 +3093,13 @@ function sendEmail() {
 function exportCSV(type) {
   const csvData = {
     stock: [['Source','Product','Balance (L)','Reserved','Available','Reorder','Status'],...DATA.stock.map(s=>[(s.source?.name||''),(s.product?.name||''),s.current_balance||0,s.reserved_quantity||0,(s.current_balance||0)-(s.reserved_quantity||0),s.reorder_level||0,(s.current_balance||0)<=(s.reorder_level||0)?'LOW STOCK':'OK'])],
-    releases: [['Release No','SORD No','Date','Customer','Product','Source','Qty Auth (L)','Released (L)','Balance (L)','Unit Price (USD)','Total (USD)','Truck Reg','Trailer Reg','Driver','Signatory','Status'],...DATA.releases.map(r=>[r.release_no,r.sord_number||'',r.release_date,r.customer?.name||'',r.product?.name||'',r.source?.name||'',r.quantity_requested||0,r.quantity_released||0,(r.quantity_requested||0)-(r.quantity_released||0),r.unit_price||0,r.total_amount||0,r.truck_registration||'',r.trailer_registration||'',r.driver_name||'',r.signatory||'',r.status])],
+    releases: [['Release No','SORD No','Date','Customer','Product','Source','Qty Auth (L)','Released (L)','Balance (L)','Truck Reg','Trailer Reg','Driver','Signatory','Status'],...DATA.releases.map(r=>[r.release_no,r.sord_number||'',r.release_date,r.customer?.name||'',r.product?.name||'',r.source?.name||'',r.quantity_requested||0,r.quantity_released||0,(r.quantity_requested||0)-(r.quantity_released||0),r.truck_registration||'',r.trailer_registration||'',r.driver_name||'',r.signatory||'',r.status])],
     invoices: [['Invoice No','Date','Customer','Product','Qty (L)','Total (USD)','Paid (USD)','Balance (USD)','Status'],...DATA.invoices.map(i=>[i.invoice_no,i.invoice_date,i.customer?.name||'',i.product?.name||'',i.quantity||0,i.total_amount||0,i.amount_paid||0,i.balance_due||0,i.status])],
-    suppliers: [['Supply Type','Supplier','Invoice Ref','Product','Qty Ordered (L)','Qty Drawn (L)','Balance (L)','Value (USD)','Release Date','Status'],...DATA.suppliers.map(s=>[s.supply_type||'Local',s.supplier_name||'',s.invoice_number||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.total_amount||0,s.expected_date||'',s.status])],
-    blends: [['Ref','Date','Blend Ratio','Base Qty','Additive Qty','Output','Cost/L','Total Cost'],...DATA.blends.map(b=>[b.blend_ref,b.blend_date,b.blend_ratio+'%',b.base_quantity||0,b.additive_quantity||0,b.output_quantity||0,b.cost_per_litre||0,b.total_cost||0])],
+    suppliers: [['Supply Type','Supplier','Invoice Ref','Delivery','Product','Qty Ordered (L)','Qty Drawn (L)','Balance (L)','Product Value (USD)','Duty (USD)','Total (USD)','Status'],...DATA.suppliers.map(s=>[s.supply_type||'Local',s.supplier_name||'',s.invoice_number||'',s.delivery_method||'Road',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),(s.quantity_ordered||0)*(s.unit_price||0),s.duty_amount||0,s.total_amount||0,s.status])],
     stations: [['Name','Type','Province','Capacity','Status'],...DATA.sites.map(s=>[s.name,s.type,s.province?.name||'',s.tank_capacity||0,s.is_active?'Active':'Inactive'])],
-    trucks: [['Reg No','Transporter','Make/Model','Year','Max Capacity (L)','Compartments','Tare (kg)','Default Driver','Driver ID','Driver Phone','Status'],...DATA.trucks.map(t=>[t.registration_no,t.transporter?.name||'',t.make_model||'',t.year||'',t.max_capacity_litres||0,t.compartments||0,t.tare_weight_kg||0,t.default_driver||'',t.driver_id_no||'',t.driver_phone||'',t.is_active!==false?'Active':'Inactive'])],
-
-    sector_product: (() => {
-      // Build pivot: rows=sectors, cols=products
-      const sectors = [...new Set(DATA.customers.map(c=>c.sector?.name||'Unknown'))].sort();
-      const products = [...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
-      const rows = [['Sector', ...products, 'Total (L)']];
-      sectors.forEach(sec => {
-        const custIds = DATA.customers.filter(c=>(c.sector?.name||'Unknown')===sec).map(c=>c.id);
-        const rels = DATA.releases.filter(r=>custIds.includes(r.customer_id));
-        const row = [sec];
-        let total = 0;
-        products.forEach(prod => {
-          const vol = rels.filter(r=>(r.product?.name||'Unknown')===prod).reduce((s,r)=>s+(r.quantity_released||0),0);
-          row.push(vol); total+=vol;
-        });
-        row.push(total);
-        rows.push(row);
-      });
-      // Totals row
-      const totRow = ['TOTAL'];
-      products.forEach(prod => {
-        totRow.push(DATA.releases.filter(r=>(r.product?.name||'Unknown')===prod).reduce((s,r)=>s+(r.quantity_released||0),0));
-      });
-      totRow.push(DATA.releases.reduce((s,r)=>s+(r.quantity_released||0),0));
-      rows.push(totRow);
-      return rows;
-    })(),
-
-    province_product: (() => {
-      const provinces = [...new Set(DATA.customers.map(c=>c.province?.name||'Unknown'))].sort();
-      const products = [...new Set(DATA.releases.map(r=>r.product?.name||'Unknown'))].sort();
-      const rows = [['Province', ...products, 'Total (L)']];
-      provinces.forEach(prov => {
-        const custIds = DATA.customers.filter(c=>(c.province?.name||'Unknown')===prov).map(c=>c.id);
-        const rels = DATA.releases.filter(r=>custIds.includes(r.customer_id));
-        const row = [prov];
-        let total = 0;
-        products.forEach(prod => {
-          const vol = rels.filter(r=>(r.product?.name||'Unknown')===prod).reduce((s,r)=>s+(r.quantity_released||0),0);
-          row.push(vol); total+=vol;
-        });
-        row.push(total);
-        rows.push(row);
-      });
-      return rows;
-    })(),
-
-    local_import: (() => {
-      const local = DATA.suppliers.filter(s=>s.supply_type!=='Import');
-      const imports = DATA.suppliers.filter(s=>s.supply_type==='Import');
-      const products = [...new Set(DATA.suppliers.map(s=>s.product?.name||'Unknown'))].sort();
-      const rows = [['Supply Type','Supplier','Product','Qty Ordered (L)','Qty Drawn (L)','Balance (L)','Value (USD)','Status']];
-      [...local,...imports].forEach(s=>{
-        rows.push([s.supply_type||'Local',s.supplier_name||'',s.product?.name||'',s.quantity_ordered||0,s.quantity_drawn||0,(s.quantity_ordered||0)-(s.quantity_drawn||0),s.total_amount||0,s.status||'']);
-      });
-      rows.push([]);
-      rows.push(['SUMMARY','','','','','','','']);
-      rows.push(['Local Purchases',local.length+' suppliers','',local.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','',local.reduce((s,x)=>s+(x.total_amount||0),0),'']);
-      rows.push(['Import Purchases',imports.length+' suppliers','',imports.reduce((s,x)=>s+(x.quantity_ordered||0),0),'','',imports.reduce((s,x)=>s+(x.total_amount||0),0),'']);
-      return rows;
-    })()
+    trucks: [['Reg No','Transporter','Capacity (L)','Compartments','Default Driver','Driver Phone','Status'],...DATA.trucks.map(t=>[t.registration_no,t.transporter?.name||'',t.max_capacity_litres||0,t.compartments||0,t.default_driver||'',t.driver_phone||'',t.is_active!==false?'Active':'Inactive'])],
+    sector_province: exportCSVGetRows('sector_province'),
+    local_import: exportCSVGetRows('local_import'),
   };
   const rows = csvData[type];
   if (!rows) { toast('No data for this report type','warning'); return; }
