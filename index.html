@@ -2914,7 +2914,6 @@ function buildReleaseForm(r, bal) {
         <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151;width:45%">Product</td><td style="padding:7px 14px;font-weight:700">${r.product?.name||'—'}</td></tr>
         <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">Quantity</td><td style="padding:7px 14px;font-weight:800;font-size:13px">${fmt(r.quantity_requested||0)} Litres</td></tr>
         <tr style="border-top:1px solid #e5e7eb"><td style="padding:7px 14px;color:#374151">NOIC Sales Order No.</td><td style="padding:7px 14px;font-weight:700;color:#e85d26">${r.sord_number||'— Pending —'}</td></tr>
-        ${bal>0?`<tr style="background:#fff7ed;border-top:1px solid #fed7aa"><td style="padding:7px 14px;color:#92400e">Balance Remaining</td><td style="padding:7px 14px;font-weight:700;color:#e85d26">${fmt(bal)} Litres</td></tr>`:''}
       </table>
     </div>
 
