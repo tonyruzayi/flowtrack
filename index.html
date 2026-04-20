@@ -2238,8 +2238,8 @@ async function openCRUD(type, id) {
       u.role?.permissions?.approve || u.role?.permissions?.all
     );
     if (manager) {
-      record.signatory = record.signatory || manager.full_name;
-      record.signatory_title = record.signatory_title || manager.department || manager.role?.name || '';
+      // Only use full_name (a real person name), never fall back to role name
+      record.signatory = record.signatory || manager.full_name || '';
     }
   }
 
@@ -2867,12 +2867,17 @@ function buildReleaseForm(r, bal) {
   const auth1 = getUser(r.signatory);
   const auth2 = r.signatory2 ? getUser(r.signatory2) : null;
   const auth3 = r.signatory3 ? getUser(r.signatory3) : null;
+  // Only include signatories that look like real person names (have a space, i.e. first + last)
+  // This prevents role names like "Manager" from printing
+  const isRealName = (n) => n && n.trim().includes(' ');
   const auths = [
-    r.signatory ? { name:r.signatory, phone:auth1?.phone||'', img:_signatures[r.signatory]||null } : null,
-    r.signatory2 ? { name:r.signatory2, phone:auth2?.phone||'', img:_signatures[r.signatory2]||null } : null,
-    r.signatory3 ? { name:r.signatory3, phone:auth3?.phone||'', img:_signatures[r.signatory3]||null } : null,
+    r.signatory  ? { name:r.signatory,  phone:auth1?.phone||'', img:_signatures[r.signatory]||null,  valid:isRealName(r.signatory)  } : null,
+    r.signatory2 ? { name:r.signatory2, phone:auth2?.phone||'', img:_signatures[r.signatory2]||null, valid:isRealName(r.signatory2) } : null,
+    r.signatory3 ? { name:r.signatory3, phone:auth3?.phone||'', img:_signatures[r.signatory3]||null, valid:isRealName(r.signatory3) } : null,
   ].filter(Boolean);
-  const sigCols = `repeat(${auths.length},1fr)`;
+  // Always show at least one signature column even if empty
+  const sigCount = Math.max(auths.length, 1);
+  const sigCols = `repeat(${sigCount},1fr)`;
 
   return `<div class="pf-wrap" id="pf-rf-inner" style="font-family:'DM Sans',Arial,sans-serif;background:#fff;color:#111;max-width:700px;margin:auto;padding:0">
     <!-- Header: Company letterhead (not customer) -->
@@ -2893,7 +2898,6 @@ function buildReleaseForm(r, bal) {
     <div style="padding:14px 24px 4px;font-size:11px;line-height:1.8">
       <div>The Depot Manager</div>
       <div style="font-weight:700">National Oil Infrastructure Company of Zimbabwe</div>
-      <div>${r.source?.name||'Msasa'}</div>
     </div>
     <div style="padding:4px 24px 12px;font-size:11px">Dear Sir/Madam</div>
 
@@ -2930,16 +2934,21 @@ function buildReleaseForm(r, bal) {
     <div style="padding:14px 24px">
       <div style="font-size:11px;color:#374151;margin-bottom:14px">For and on behalf of <strong>${companyName}</strong></div>
       <div style="display:grid;grid-template-columns:${sigCols};gap:20px">
-        ${auths.map(a=>`
+        ${auths.length ? auths.map(a=>`
           <div>
             <div style="height:52px;border-bottom:1.5px solid #374151;margin-bottom:6px;display:flex;align-items:flex-end;padding-bottom:4px">
               ${a.img?`<img src="${a.img}" style="max-height:46px;max-width:130px;object-fit:contain"/>`:
               `<span style="font-size:9px;color:#d1d5db;font-style:italic">No e-signature</span>`}
             </div>
             <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">Authorised Signatory</div>
-            <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">${a.name}</div>
-            ${a.phone?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${a.phone}</div>`:''}
-          </div>`).join('')}
+            <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">${a.valid ? a.name : '&nbsp;'}</div>
+            ${a.phone&&a.valid?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${a.phone}</div>`:''}
+          </div>`).join('') :
+        `<div>
+          <div style="height:52px;border-bottom:1.5px solid #374151;margin-bottom:6px"></div>
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">Authorised Signatory</div>
+          <div style="font-size:11px;font-weight:800;color:#0a0f1e;margin-top:2px">&nbsp;</div>
+        </div>`}
       </div>
     </div>
 
