@@ -889,7 +889,7 @@ async function loadAll() {
       sb.from('stock_levels').select('*,source:sources(name,type),product:products(name,unit)'),
       sb.from('stock_transactions').select('*,source:sources(name),product:products(name)').order('created_at',{ascending:false}).limit(50),
       sb.from('release_orders').select('*,customer:customers(name,tin),source:sources(name),product:products(name,hs_code),transporter:transporters(name)').order('created_at',{ascending:false}),
-      sb.from('release_drawdowns').select('*,release_order:release_orders(release_no,customer:customers(name),product:products(name)),supplier:supplier_purchases(supplier_name,invoice_number,quantity_ordered,quantity_drawn,product:products(name))').order('created_at',{ascending:false}),
+      sb.from('release_drawdowns').select('*,supplier_purchase:supplier_purchases(id,supplier_name,invoice_number,quantity_ordered,quantity_drawn,product:products(name),source:sources(name))').order('created_at',{ascending:false}),
       sb.from('invoices').select('*,customer:customers(name),product:products(name,hs_code),release_order:release_orders(release_no)').order('created_at',{ascending:false}),
       sb.from('supplier_purchases').select('*,source:sources(name),product:products(name)').order('created_at',{ascending:false}),
       sb.from('blending_records').select('*').order('created_at',{ascending:false}),
@@ -1269,10 +1269,11 @@ function renderDrawdowns() {
   const tbl = document.getElementById('dd-tbl');
   if (!tbl) return;
   tbl.innerHTML = DATA.drawdowns.length ? DATA.drawdowns.map(d=>{
-    const sup = DATA.suppliers.find(s=>s.id===d.supplier_purchase_id)
-             || (d.supplier ? { supplier_name:d.supplier.supplier_name, invoice_number:d.supplier.invoice_number, quantity_ordered:d.supplier.quantity_ordered, quantity_drawn:d.supplier.quantity_drawn, product:d.supplier.product } : null);
+    // Use the joined supplier_purchase data, fallback to DATA.suppliers lookup
+    const sup = d.supplier_purchase
+             || DATA.suppliers.find(s=>s.id===d.supplier_purchase_id);
     const bal = sup ? Math.max(0,(sup.quantity_ordered||0)-(sup.quantity_drawn||0)) : null;
-    const fullyDrawn = bal === 0;
+    const fullyDrawn = sup && (sup.quantity_drawn||0) >= (sup.quantity_ordered||0);
     return `<tr>
       <td class="mono tbld" style="color:var(--brand)">${d.sord_number||'—'}</td>
       <td>${fmtDate(d.drawdown_date)}</td>
@@ -1826,17 +1827,14 @@ function calcSupplierTotal() {
 
 function prefillReleaseFromSORD(sordNumber) {
   if (!sordNumber) return;
-  // Find the drawdown entry for this SORD
   const dd = DATA.drawdowns.find(d => d.sord_number === sordNumber);
   if (!dd) return;
-  const sup = DATA.suppliers.find(s => s.id === dd.supplier_purchase_id);
+  const sup = dd.supplier_purchase || DATA.suppliers.find(s => s.id === dd.supplier_purchase_id);
   if (!sup) return;
-  // Auto-fill product and source from the supplier release
   const prodSel = document.getElementById('f-prod');
   if (prodSel && sup.product_id && !prodSel.value) prodSel.value = sup.product_id;
   const srcSel = document.getElementById('f-src');
   if (srcSel && sup.source_id && !srcSel.value) srcSel.value = sup.source_id;
-  // Show how much is available on this SORD
   const qtyEl = document.getElementById('f-qty');
   if (qtyEl && !qtyEl.value) qtyEl.placeholder = 'SORD Volume: ' + fmt(dd.quantity||0) + ' L';
   toast('SORD selected — product and source prefilled', 'success');
@@ -2105,11 +2103,17 @@ const FORMS = {
     <div class="fg"><label>NOIC Sales Order No. (SORD)</label>
       <select class="sel" id="f-sord" onchange="prefillReleaseFromSORD(this.value)">
         <option value="">— Select from SORD Tracker —</option>
-        ${[...new Map(DATA.drawdowns.filter(dd=>dd.sord_number).map(dd=>[dd.sord_number,dd])).values()].map(dd=>{
-          const sup = DATA.suppliers.find(s=>s.id===dd.supplier_purchase_id);
-          return `<option value="${dd.sord_number}" ${d.sord_number===dd.sord_number?'selected':''}>${dd.sord_number} · ${sup?.supplier_name||'—'} · ${sup?.product?.name||dd.release_order?.product?.name||'—'} · ${fmt(dd.quantity||0)} L</option>`;
-        }).join('')}
-        ${d.sord_number && !DATA.drawdowns.find(dd=>dd.sord_number===d.sord_number) ? `<option value="${d.sord_number}" selected>${d.sord_number}</option>` : ''}
+        ${(()=>{
+          // Deduplicate by SORD number, get all unique SORDs entered
+          const seen = new Set();
+          return DATA.drawdowns
+            .filter(dd => dd.sord_number && !seen.has(dd.sord_number) && seen.add(dd.sord_number))
+            .map(dd => {
+              const sup = dd.supplier_purchase || DATA.suppliers.find(s=>s.id===dd.supplier_purchase_id);
+              const label = `${dd.sord_number} · ${sup?.supplier_name||'—'} · ${sup?.product?.name||'—'} · ${fmt(dd.quantity||0)} L`;
+              return `<option value="${dd.sord_number}" ${d.sord_number===dd.sord_number?'selected':''}>${label}</option>`;
+            }).join('');
+        })()}
       </select>
     </div>
     <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.release_date||today()}"/></div>
@@ -2366,28 +2370,37 @@ async function saveCRUD() {
   else if (type==='drawdown') {
     if (!g('f-sup-rel')) { toast('Please select a Supplier Release','warning'); return; }
     if (!gn('f-qty')){ toast('Please enter a Volume','warning'); return; }
+    const drawQty = gn('f-qty');
+    // Guard: prevent overdrawing the supplier release
+    const sup = DATA.suppliers.find(s=>s.id===g('f-sup-rel'));
+    if (sup) {
+      const available = (sup.quantity_ordered||0) - (sup.quantity_drawn||0);
+      if (drawQty > available) {
+        toast(`Cannot exceed available balance. Available: ${fmt(available)} L, Entered: ${fmt(drawQty)} L`, 'error');
+        return;
+      }
+    }
     payload={
       supplier_purchase_id: g('f-sup-rel')||null,
       sord_number: g('f-sord-dd'),
       drawdown_date: g('f-date'),
-      quantity: gn('f-qty'),
+      quantity: drawQty,
       notes: g('f-notes')
     };
-    // After saving drawdown, update supplier_purchase quantity_drawn
+    // After saving, update supplier_purchase quantity_drawn
     if (payload.supplier_purchase_id && payload.quantity) {
-      const sup = DATA.suppliers.find(s=>s.id===payload.supplier_purchase_id);
-      if (sup) {
-        const newDrawn = (sup.quantity_drawn||0) + payload.quantity;
-        const newStatus = newDrawn >= (sup.quantity_ordered||0) ? 'Received' : 'Partial';
+      const supRec = DATA.suppliers.find(s=>s.id===payload.supplier_purchase_id);
+      if (supRec) {
+        const newDrawn = (supRec.quantity_drawn||0) + payload.quantity;
+        const newStatus = newDrawn >= (supRec.quantity_ordered||0) ? 'Received' : 'Partial';
         setTimeout(async()=>{
           await sb.from('supplier_purchases').update({quantity_drawn:newDrawn,status:newStatus}).eq('id',payload.supplier_purchase_id);
-          // Update stock levels if source is known
-          if (sup.source_id && sup.product_id) {
-            const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',sup.source_id).eq('product_id',sup.product_id).maybeSingle();
+          if (supRec.source_id && supRec.product_id) {
+            const {data:sl} = await sb.from('stock_levels').select('*').eq('source_id',supRec.source_id).eq('product_id',supRec.product_id).maybeSingle();
             if (sl) {
               const newBal = (sl.current_balance||0) + payload.quantity;
               await sb.from('stock_levels').update({current_balance:newBal,last_updated:new Date().toISOString()}).eq('id',sl.id);
-              await sb.from('stock_transactions').insert({source_id:sup.source_id,product_id:sup.product_id,transaction_type:'Intake',reference_no:payload.sord_number||sup.invoice_number,quantity:payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'SORD collection: '+(payload.sord_number||'—')});
+              await sb.from('stock_transactions').insert({source_id:supRec.source_id,product_id:supRec.product_id,transaction_type:'Intake',reference_no:payload.sord_number||supRec.invoice_number,quantity:payload.quantity,balance_before:sl.current_balance,balance_after:newBal,notes:'SORD: '+(payload.sord_number||'—')});
             }
           }
           await loadAll(); renderPage(currentPage());
