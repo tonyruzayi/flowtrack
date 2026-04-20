@@ -2190,8 +2190,17 @@ const FORMS = {
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
   </div>`,
 
-  supplier: (d={})=>`<div class="fgrid">
-    <div class="fg full"><label>Supplier Name *</label><input class="inp" id="f-supname" value="${d.supplier_name||''}" placeholder="e.g. NOIC, Zuva Petroleum, Puma Energy"/></div>
+  supplier: (d={})=>{
+    // Build unique supplier names from existing records for the datalist
+    const knownSuppliers = [...new Set(DATA.suppliers.map(s=>s.supplier_name).filter(Boolean))].sort();
+    return `<div class="fgrid">
+    <div class="fg full">
+      <label>Supplier Name *</label>
+      <input class="inp" id="f-supname" value="${d.supplier_name||''}" list="supplier-names-list" placeholder="Select or type supplier name" autocomplete="off"/>
+      <datalist id="supplier-names-list">
+        ${knownSuppliers.map(n=>`<option value="${n}"/>`).join('')}
+      </datalist>
+    </div>
     <div class="fg"><label>Supply Type *</label><select class="sel" id="f-suptype"><option value="Local" ${d.supply_type!=='Import'?'selected':''}>Local (Domestic Supplier)</option><option value="Import" ${d.supply_type==='Import'?'selected':''}>Import (External/Foreign)</option></select></div>
     <div class="fg"><label>Delivery Method</label><select class="sel" id="f-delivery"><option value="Road" ${d.delivery_method==='Road'?'selected':''}>Road</option><option value="Pipeline" ${d.delivery_method==='Pipeline'?'selected':''}>Pipeline</option><option value="Rail" ${d.delivery_method==='Rail'?'selected':''}>Rail</option></select></div>
     <div class="fg"><label>Release Reference *</label><input class="inp" id="f-ref" value="${d.invoice_number||autoRelNo().replace('REL','PO')}" placeholder="Supplier release/invoice reference"/></div>
@@ -2207,7 +2216,8 @@ const FORMS = {
     <div class="fg"><label>Expected Delivery Date</label><input class="inp" type="date" id="f-exp" value="${d.expected_date||today()}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Received'?'selected':''}>Received</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
-  </div>`
+  </div>`;
+  }
 };
 
 async function openCRUD(type, id) {
@@ -2417,7 +2427,8 @@ async function saveCRUD() {
   }
 
   if (!payload.name && !payload.full_name && !payload.release_no && !payload.invoice_no &&
-      !payload.supplier_name && !payload.registration_no && !payload.release_order_id) {
+      !payload.supplier_name && !payload.registration_no && !payload.release_order_id &&
+      !payload.supplier_purchase_id && !payload.sord_number) {
     toast('Please fill in all required fields','warning'); return;
   }
 
