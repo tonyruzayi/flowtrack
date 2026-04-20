@@ -2367,6 +2367,18 @@ async function saveCRUD() {
     if (!g('f-sup-rel')) { toast('Please select a Supplier Release','warning'); return; }
     if (!gn('f-qty')){ toast('Please enter a Volume','warning'); return; }
     const drawQty = gn('f-qty');
+    const sordNo = g('f-sord-dd');
+
+    // Guard: duplicate SORD number check
+    if (sordNo) {
+      const existing = DATA.drawdowns.find(d => d.sord_number === sordNo && d.id !== _crudRecord?.id);
+      if (existing) {
+        const sup = DATA.suppliers.find(s => s.id === existing.supplier_purchase_id);
+        toast(`SORD "${sordNo}" already exists — linked to ${sup?.supplier_name||'a supplier release'} on ${fmtDate(existing.drawdown_date)}. Each SORD number must be unique.`, 'error');
+        return;
+      }
+    }
+
     // Guard: prevent overdrawing the supplier release
     const sup = DATA.suppliers.find(s=>s.id===g('f-sup-rel'));
     if (sup) {
