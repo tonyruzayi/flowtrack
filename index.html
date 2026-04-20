@@ -531,7 +531,7 @@ label{font-size:.73rem;font-weight:600;color:var(--txt)}
 <!-- DRAWDOWNS / SORD TRACKER -->
 <section class="page" id="page-drawdowns">
   <div class="sh"><div><div class="st">SORD Tracker</div><div class="ss">Track collections against approved NOIC SORDs. Each drawdown reduces the SORD balance and updates stock levels automatically.</div></div><button class="btn btn-b btn-sm" onclick="openCRUD('drawdown',null)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Record Collection</button></div>
-  <div class="tw"><table><thead><tr><th>SORD No.</th><th>Date Received</th><th>Supplier</th><th>Product</th><th>Volume (L)</th><th>SORD Balance (L)</th><th>Collected By</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="8" class="empty">No SORD entries yet.</td></tr></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>SORD No.</th><th>Date Received</th><th>Supplier Release</th><th>Product</th><th>Volume (L)</th><th>Supplier Balance (L)</th><th></th></tr></thead><tbody id="dd-tbl"><tr><td colspan="7" class="empty">No SORD entries yet.</td></tr></tbody></table></div>
 </section>
 
 <!-- APPROVALS -->
@@ -1269,23 +1269,23 @@ function renderDrawdowns() {
   const tbl = document.getElementById('dd-tbl');
   if (!tbl) return;
   tbl.innerHTML = DATA.drawdowns.length ? DATA.drawdowns.map(d=>{
-    // Link to supplier purchase
-    const sup = DATA.suppliers.find(s=>s.id===d.supplier_purchase_id) ||
-                DATA.suppliers.find(s=>s.id===d.release_order_id); // fallback
-    const totalOrdered = sup?.quantity_ordered || 0;
-    const totalDrawn = sup?.quantity_drawn || 0;
-    const sordBal = totalOrdered - totalDrawn;
+    const sup = DATA.suppliers.find(s=>s.id===d.supplier_purchase_id)
+             || (d.supplier ? { supplier_name:d.supplier.supplier_name, invoice_number:d.supplier.invoice_number, quantity_ordered:d.supplier.quantity_ordered, quantity_drawn:d.supplier.quantity_drawn, product:d.supplier.product } : null);
+    const bal = sup ? Math.max(0,(sup.quantity_ordered||0)-(sup.quantity_drawn||0)) : null;
+    const fullyDrawn = bal === 0;
     return `<tr>
-      <td class="mono" style="color:var(--brand);font-weight:700">${d.sord_number||'—'}</td>
+      <td class="mono tbld" style="color:var(--brand)">${d.sord_number||'—'}</td>
       <td>${fmtDate(d.drawdown_date)}</td>
-      <td class="tbld">${sup?.supplier_name||'—'}</td>
-      <td>${sup?.product?.name||d.release_order?.product?.name||'—'}</td>
+      <td class="txs">${sup?.invoice_number||'—'}<br><span class="tmut">${sup?.supplier_name||'—'}</span></td>
+      <td>${sup?.product?.name||'—'}</td>
       <td style="font-weight:700;color:var(--em)">${fmt(d.quantity||0)} L</td>
-      <td style="font-weight:700;color:${sordBal<=0?'var(--em)':'var(--brand)'}">${fmt(Math.max(0,sordBal))} L ${sordBal<=0?'<span class="badge bg" style="font-size:.6rem">Fully Drawn</span>':''}</td>
-      <td>${d.collected_by||'—'}</td>
+      <td style="font-weight:700;color:${fullyDrawn?'var(--em)':'var(--brand)'}">
+        ${bal!==null ? fmt(bal)+' L' : '—'}
+        ${fullyDrawn?'<span class="badge bg" style="margin-left:4px;font-size:.6rem">Fully Drawn</span>':''}
+      </td>
       <td><button class="btn btn-d btn-sm btn-icon" onclick="confirmDelete('release_drawdowns','${d.id}','SORD ${d.sord_number||'entry'}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">No SORD entries yet. Record a collection above.</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty">No SORD entries yet. Use the button above to record a new SORD received from NOIC.</td></tr>';
 }
 
 function renderApprovals() {
@@ -1824,15 +1824,42 @@ function calcSupplierTotal() {
   if (ta) ta.value = total ? total.toFixed(2) : '';
 }
 
+function prefillReleaseFromSORD(sordNumber) {
+  if (!sordNumber) return;
+  // Find the drawdown entry for this SORD
+  const dd = DATA.drawdowns.find(d => d.sord_number === sordNumber);
+  if (!dd) return;
+  const sup = DATA.suppliers.find(s => s.id === dd.supplier_purchase_id);
+  if (!sup) return;
+  // Auto-fill product and source from the supplier release
+  const prodSel = document.getElementById('f-prod');
+  if (prodSel && sup.product_id && !prodSel.value) prodSel.value = sup.product_id;
+  const srcSel = document.getElementById('f-src');
+  if (srcSel && sup.source_id && !srcSel.value) srcSel.value = sup.source_id;
+  // Show how much is available on this SORD
+  const qtyEl = document.getElementById('f-qty');
+  if (qtyEl && !qtyEl.value) qtyEl.placeholder = 'SORD Volume: ' + fmt(dd.quantity||0) + ' L';
+  toast('SORD selected — product and source prefilled', 'success');
+}
+
 function prefillDrawdownFromSupplier(supplierId) {
   if (!supplierId) return;
   const s = DATA.suppliers.find(x => x.id === supplierId);
   if (!s) return;
   const remaining = (s.quantity_ordered || 0) - (s.quantity_drawn || 0);
+  // Auto-fill volume with remaining balance as a hint
   const qtyEl = document.getElementById('f-qty');
-  if (qtyEl && !qtyEl.value) { qtyEl.value = remaining; qtyEl.placeholder = 'Max: ' + fmt(remaining) + ' L'; }
-  const dutiesEl = document.getElementById('f-duties-qty');
-  if (dutiesEl && !dutiesEl.value) dutiesEl.value = remaining;
+  if (qtyEl && !qtyEl.value) qtyEl.placeholder = 'Max remaining: ' + fmt(remaining) + ' L';
+  // Check if any existing SORD tracker entries for this supplier — fill last known SORD
+  const existingDrawdown = DATA.drawdowns
+    .filter(d => d.supplier_purchase_id === supplierId && d.sord_number)
+    .sort((a,b) => new Date(b.drawdown_date) - new Date(a.drawdown_date))[0];
+  const sordEl = document.getElementById('f-sord-dd');
+  if (sordEl && !sordEl.value && existingDrawdown?.sord_number) {
+    sordEl.value = existingDrawdown.sord_number;
+    sordEl.style.background = 'var(--sur)';
+    sordEl.title = 'Auto-filled from last entry — update if this is a new SORD';
+  }
 }
 
 function filterTrucksByTransporter(transporterId) {
@@ -2075,7 +2102,16 @@ const FORMS = {
 
   release: (d={})=>`<div class="fgrid">
     <div class="fg"><label>Uplift / Release No. (Internal)</label><input class="inp" id="f-relno" value="${d.release_no||autoRelNo()}"/></div>
-    <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord" value="${d.sord_number||''}" placeholder="e.g. S-ORD22-065203"/></div>
+    <div class="fg"><label>NOIC Sales Order No. (SORD)</label>
+      <select class="sel" id="f-sord" onchange="prefillReleaseFromSORD(this.value)">
+        <option value="">— Select from SORD Tracker —</option>
+        ${[...new Map(DATA.drawdowns.filter(dd=>dd.sord_number).map(dd=>[dd.sord_number,dd])).values()].map(dd=>{
+          const sup = DATA.suppliers.find(s=>s.id===dd.supplier_purchase_id);
+          return `<option value="${dd.sord_number}" ${d.sord_number===dd.sord_number?'selected':''}>${dd.sord_number} · ${sup?.supplier_name||'—'} · ${sup?.product?.name||dd.release_order?.product?.name||'—'} · ${fmt(dd.quantity||0)} L</option>`;
+        }).join('')}
+        ${d.sord_number && !DATA.drawdowns.find(dd=>dd.sord_number===d.sord_number) ? `<option value="${d.sord_number}" selected>${d.sord_number}</option>` : ''}
+      </select>
+    </div>
     <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.release_date||today()}"/></div>
     <div class="fg"><label>Customer *</label><select class="sel" id="f-cust"><option value="">— Select —</option>${DATA.customers.map(c=>`<option value="${c.id}" ${d.customer_id===c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Source Depot *</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
@@ -2122,17 +2158,16 @@ const FORMS = {
   </div>`,
 
   drawdown: (d={})=>`<div class="fgrid">
-    <div class="fg full"><label>Supplier Release / Purchase *</label>
+    <div class="fg full"><label>Supplier Release *</label>
       <select class="sel" id="f-sup-rel" onchange="prefillDrawdownFromSupplier(this.value)">
         <option value="">— Select Supplier Release —</option>
-        ${DATA.suppliers.filter(s=>s.status==='Pending'||s.status==='Partial').map(s=>`<option value="${s.id}" ${d.supplier_purchase_id===s.id?'selected':''}>${s.invoice_number||s.reference_no} — ${s.supplier_name||'—'} — ${fmt((s.quantity_ordered||0)-(s.quantity_drawn||0))} L remaining</option>`).join('')}
+        ${DATA.suppliers.map(s=>`<option value="${s.id}" ${d.supplier_purchase_id===s.id?'selected':''}>${s.invoice_number||s.reference_no||'—'} · ${s.supplier_name||'—'} · ${s.product?.name||'—'} · Bal: ${fmt((s.quantity_ordered||0)-(s.quantity_drawn||0))} L</option>`).join('')}
       </select>
     </div>
-    <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord-dd" value="${d.sord_number||''}" placeholder="e.g. S-ORD22-065203"/></div>
-    <div class="fg"><label>Date (Date SORD Received)</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
-    <div class="fg"><label>Volume (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Quantity on this SORD"/></div>
-    <div class="fg"><label>Collected By (Name)</label><input class="inp" id="f-colby" value="${d.collected_by||''}"/></div>
-    <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
+    <div class="fg"><label>NOIC Sales Order No. (SORD) *</label><input class="inp" id="f-sord-dd" value="${d.sord_number||''}" placeholder="Auto-filled or type manually"/></div>
+    <div class="fg"><label>Date SORD Received</label><input class="inp" type="date" id="f-date" value="${d.drawdown_date||today()}"/></div>
+    <div class="fg"><label>Volume (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity||''}" placeholder="Volume on this SORD"/></div>
+    <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes" style="min-height:50px">${d.notes||''}</textarea></div>
   </div>`,
 
   invoice: (d={})=>`<div class="fgrid">
@@ -2156,19 +2191,19 @@ const FORMS = {
   </div>`,
 
   supplier: (d={})=>`<div class="fgrid">
-    <div class="fg full"><label>Supplier Name *</label><input class="inp" id="f-name" value="${d.supplier_name||''}"/></div>
+    <div class="fg full"><label>Supplier Name *</label><input class="inp" id="f-supname" value="${d.supplier_name||''}" placeholder="e.g. NOIC, Zuva Petroleum, Puma Energy"/></div>
     <div class="fg"><label>Supply Type *</label><select class="sel" id="f-suptype"><option value="Local" ${d.supply_type!=='Import'?'selected':''}>Local (Domestic Supplier)</option><option value="Import" ${d.supply_type==='Import'?'selected':''}>Import (External/Foreign)</option></select></div>
     <div class="fg"><label>Delivery Method</label><select class="sel" id="f-delivery"><option value="Road" ${d.delivery_method==='Road'?'selected':''}>Road</option><option value="Pipeline" ${d.delivery_method==='Pipeline'?'selected':''}>Pipeline</option><option value="Rail" ${d.delivery_method==='Rail'?'selected':''}>Rail</option></select></div>
     <div class="fg"><label>Release Reference *</label><input class="inp" id="f-ref" value="${d.invoice_number||autoRelNo().replace('REL','PO')}" placeholder="Supplier release/invoice reference"/></div>
     <div class="fg"><label>Release Date</label><input class="inp" type="date" id="f-date" value="${d.invoice_date||today()}"/></div>
     <div class="fg"><label>Product *</label><select class="sel" id="f-prod"><option value="">— Select —</option>${DATA.products.map(p=>`<option value="${p.id}" ${d.product_id===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
     <div class="fg"><label>Source (Supplier/Origin)</label><select class="sel" id="f-src"><option value="">— Select —</option>${DATA.sources.map(s=>`<option value="${s.id}" ${d.source_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
-    <div class="fg"><label>Depot / Delivery Location</label><input class="inp" id="f-depot-loc" value="${d.depot_location||''}" placeholder="Where the fuel will be delivered to"/></div>
-    <div class="fg"><label>Quantity Ordered (L)</label><input class="inp" type="number" id="f-qty" value="${d.quantity_ordered||''}" oninput="calcSupplierTotal()"/></div>
+    <div class="fg"><label>Depot / Delivery Location</label><input class="inp" id="f-depot-loc" value="${d.depot_location||''}" placeholder="Where fuel will be delivered"/></div>
+    <div class="fg"><label>Quantity Ordered (L) *</label><input class="inp" type="number" id="f-qty" value="${d.quantity_ordered||''}" oninput="calcSupplierTotal()"/></div>
     <div class="fg"><label>Product Unit Price (USD/L)</label><input class="inp" type="number" id="f-price" value="${d.unit_price||''}" step="0.0001" oninput="calcSupplierTotal()"/></div>
     <div class="fg"><label>Duty Rate (USD/L)</label><input class="inp" type="number" id="f-duty-rate" value="${d.duty_rate||''}" step="0.0001" placeholder="Duty per litre" oninput="calcSupplierTotal()"/></div>
-    <div class="fg"><label>Total Duty Amount (USD)</label><input class="inp" type="number" id="f-duty-amount" value="${d.duty_amount||''}" placeholder="Auto-calculated" readonly style="background:var(--sur)"/></div>
-    <div class="fg"><label>Total Invoice Amount (USD)</label><input class="inp" type="number" id="f-total-amount" value="${d.total_amount||''}" placeholder="Product + Duty" readonly style="background:var(--sur);font-weight:700"/></div>
+    <div class="fg"><label>Total Duty (USD) <span class="txs tmut">auto</span></label><input class="inp" type="number" id="f-duty-amount" value="${d.duty_amount||''}" readonly style="background:var(--sur)"/></div>
+    <div class="fg"><label>Total Invoice (USD) <span class="txs tmut">auto</span></label><input class="inp" type="number" id="f-total-amount" value="${d.total_amount||''}" readonly style="background:var(--sur);font-weight:700"/></div>
     <div class="fg"><label>Expected Delivery Date</label><input class="inp" type="date" id="f-exp" value="${d.expected_date||today()}"/></div>
     <div class="fg"><label>Status</label><select class="sel" id="f-status"><option ${d.status==='Pending'?'selected':''}>Pending</option><option ${d.status==='Partial'?'selected':''}>Partial</option><option ${d.status==='Received'?'selected':''}>Received</option><option ${d.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
     <div class="fg full"><label>Notes</label><textarea class="ta" id="f-notes">${d.notes||''}</textarea></div>
@@ -2321,12 +2356,13 @@ async function saveCRUD() {
   else if (type==='drawdown') {
     if (!g('f-sup-rel')) { toast('Please select a Supplier Release','warning'); return; }
     if (!gn('f-qty')){ toast('Please enter a Volume','warning'); return; }
-    payload={supplier_purchase_id:g('f-sup-rel')||null,
-      sord_number:g('f-sord-dd'),
-      drawdown_date:g('f-date'),
-      quantity:gn('f-qty'),
-      collected_by:g('f-colby'),
-      notes:g('f-notes')};
+    payload={
+      supplier_purchase_id: g('f-sup-rel')||null,
+      sord_number: g('f-sord-dd'),
+      drawdown_date: g('f-date'),
+      quantity: gn('f-qty'),
+      notes: g('f-notes')
+    };
     // After saving drawdown, update supplier_purchase quantity_drawn
     if (payload.supplier_purchase_id && payload.quantity) {
       const sup = DATA.suppliers.find(s=>s.id===payload.supplier_purchase_id);
@@ -2361,14 +2397,14 @@ async function saveCRUD() {
   }
   else if (type==='supplier') {
     const qty=gn('f-qty')||0,price=gn('f-price')||0;
-    if (!g('f-name')) { toast('Please enter a Supplier Name','warning'); return; }
+    if (!g('f-supname')) { toast('Please enter a Supplier Name','warning'); return; }
     const supRef = g('f-ref') || ('PO-'+Date.now());
     const supQty = gn('f-qty')||0;
     const supPrice = gn('f-price')||0;
     const dutyRate = gn('f-duty-rate')||0;
     const dutyAmt = supQty * dutyRate;
     const totalAmt = supQty * supPrice + dutyAmt;
-    payload={supplier_name:g('f-name'),supply_type:g('f-suptype')||'Local',
+    payload={supplier_name:g('f-supname'),supply_type:g('f-suptype')||'Local',
       delivery_method:g('f-delivery')||'Road',
       reference_no:supRef,
       invoice_number:supRef,invoice_date:g('f-date'),
